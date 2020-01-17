@@ -1,3 +1,6 @@
+use async_std::prelude::*;
+use async_std::fs::read_to_string;
+
 struct CPUMetric  {
     cpu: u16,
     user: u64,
@@ -12,6 +15,13 @@ struct CPUMetric  {
     guest_nice: u64,
 }
 
-fn monitor_cpu_usage() -> Vec<CPUMetric> {
-    unimplemented!()
+pub async fn monitor_cpu_usage() -> Result<(), String> {
+    let data = read_to_string("/proc/stat").await.map_err(|_| "failed to read /proc/stat")?;
+
+    data.lines()
+        .filter(|a| *a != "")
+        .filter(|line| line.split_whitespace().nth(0).unwrap().starts_with("cpu"))
+        .for_each(|line| println!("{}", line));
+
+    Ok(())
 }
