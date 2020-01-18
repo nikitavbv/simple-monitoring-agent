@@ -1,14 +1,15 @@
-mod cpu;
+#![feature(try_trait)]
 
-use async_std::prelude::*;
+extern crate custom_error;
+
+mod cpu;
 
 use crate::cpu::monitor_cpu_usage;
 
 #[async_std::main]
-async fn main() -> Result<(), String> {
+async fn main() {
     println!("Hello, world!");
 
-    monitor_cpu_usage().await?;
-
-    Ok(())
+    let cpu = monitor_cpu_usage().await.unwrap();
+    cpu.into_iter().for_each(|item| println!("{:?}", item.unwrap()));
 }

@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 async-std = { version = "1.4.0", features = [ "attributes" ] }
+custom_error = "1.7.1"
