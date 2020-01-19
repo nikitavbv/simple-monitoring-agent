@@ -1,0 +1,19 @@
+name: Rust
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: harmon758/postgresql-action@v1
+      with:
+        postgresql db: monitoring
+        postgresl user: monitoring_ci_user
+        postgresql password: monitoring_ci_password
+        DATABASE_URL: postgresql://monitoring_ci_user:monitoring_ci_password@localhost/monitoring  
+    - name: Build
+      run: cargo build --verbose        
+    - name: Run tests
+      run: cargo test --verbose
