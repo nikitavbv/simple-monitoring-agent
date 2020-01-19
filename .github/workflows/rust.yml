@@ -5,6 +5,8 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: rust:latest
     services:
       postgres:
         image: postgres:11-alpine
