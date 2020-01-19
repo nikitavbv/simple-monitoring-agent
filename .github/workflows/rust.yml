@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Setup database
-      run: apt update && apt install -y postgresql-client && psql -h postgres -U monitoring_ci_user -d monitoring -a -f schema.sql
+      run: als && pt update && apt install -y postgresql-client && psql -h postgres -U monitoring_ci_user -d monitoring -a -f schema.sql
       env:
         PGPASSWORD: monitoring_ci_password
     - name: Run tests
