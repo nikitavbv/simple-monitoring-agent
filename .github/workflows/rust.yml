@@ -31,3 +31,6 @@ jobs:
       run: cargo build --release
       env:
         DATABASE_URL: postgres://monitoring_ci_user:monitoring_ci_password@postgres:5432/monitoring
+    - name: Build docker image
+      run: docker login docker.pkg.github.com --username ${{ secrets.GITHUB_TOKEN }} && docker build -t docker.pkg.github.com/nikitavbv/simple-monitoring-agent/agent . && docker push docker.pkg.github.com/nikitavbv/simple-monitoring-agent/agent 
+    
