@@ -7,10 +7,8 @@ mod cpu;
 mod database;
 mod hostname;
 
-use std::thread;
 use std::time::Duration;
 
-use futures::{FutureExt, StreamExt};
 use async_std::task;
 
 use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric};

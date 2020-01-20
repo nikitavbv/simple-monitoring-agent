@@ -1,6 +1,6 @@
 use std::env;
 
-use sqlx::{PgPool, Pool, Postgres, Error as SQLXError, PgConnection};
+use sqlx::{PgPool, Pool, Error as SQLXError, PgConnection};
 
 pub type Database = Pool<PgConnection>;
 
