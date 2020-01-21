@@ -14,3 +14,13 @@ create table metric_cpu
     guest_nice integer,
     timestamp timestamp with time zone
 );
+
+create table metric_load_average
+(
+	hostname text not null,
+	timestamp timestamp with time zone not null,
+	one double precision not null,
+	five double precision not null,
+	fifteen double precision not null
+);
+
