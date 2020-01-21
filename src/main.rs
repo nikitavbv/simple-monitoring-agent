@@ -6,8 +6,10 @@ mod config;
 mod cpu;
 mod database;
 mod hostname;
+mod load_avg;
 
 use std::time::Duration;
+use std::env;
 
 use async_std::task;
 use log::{info, warn};
@@ -16,7 +18,7 @@ use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric};
 use crate::database::connect;
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
-use std::env;
+use crate::load_avg::{monitor_load_average, save_load_average_metric};
 
 #[async_std::main]
 async fn main() {
@@ -46,6 +48,11 @@ async fn main() {
                 previous_cpu_stat = Ok(v);
             },
             Err(err) => warn!("failed to get cpu stats: {}", err)
+        };
+
+        match monitor_load_average().await {
+            Ok(v) => save_load_average_metric(&database, hostname.clone(), v).await,
+            Err(err) => warn!("failed to record load average metric: {}", err)
         };
     }
 }

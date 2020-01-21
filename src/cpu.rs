@@ -59,14 +59,12 @@ custom_error!{pub CPUMetricError
 
 impl From<std::option::NoneError> for CPUMetricError {
     fn from(err: NoneError) -> Self {
-        println!("{}", "none");
         CPUMetricError::FailedToParse
     }
 }
 
 impl From<std::num::ParseIntError> for CPUMetricError {
     fn from(err: ParseIntError) -> Self {
-        println!("{}", err);
         CPUMetricError::FailedToParse
     }
 }
