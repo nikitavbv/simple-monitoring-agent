@@ -7,6 +7,7 @@ use custom_error::custom_error;
 use futures::future::join_all;
 use chrono::{Utc, DateTime, Duration};
 use sqlx::error::Error as SQLXError;
+use log::warn;
 
 use crate::database::Database;
 
@@ -145,13 +146,17 @@ pub async fn save_cpu_metric(mut database: Database, hostname: String, metric: C
 }
 
 async fn save_metric_entry(mut database: Database, hostname: &str, timestamp: DateTime<Utc>, entry: CPUMetricEntry) {
-    sqlx::query!(
+    let res: Result<_, SQLXError> = sqlx::query!(
         "insert into metric_cpu (hostname, timestamp, cpu, \"user\", nice, system, idle, iowait, irq, softirq, guest, steal, guest_nice) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning cpu",
         hostname.to_string(), timestamp,
         entry.cpu as i32, entry.user as i32, entry.nice as i32, entry.system as i32, entry.idle as i32,
         entry.iowait as i32, entry.irq as i32, entry.softirq as i32, entry.guest as i32, entry.steal as i32,
         entry.guest_nice as i32
     ).fetch_one(&mut database).await;
+
+    if res.is_err() {
+        warn!("failed to insert cpu metric to database: {}", res.err().unwrap());
+    }
 }
 
 pub async fn get_cpu_latest_insert(mut database: &Database) -> Result<DateTime<Utc>, SQLXError> {
