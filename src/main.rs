@@ -7,6 +7,7 @@ mod cpu;
 mod database;
 mod hostname;
 mod load_avg;
+mod memory;
 
 use std::time::Duration;
 use std::env;
@@ -19,6 +20,7 @@ use crate::database::connect;
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::{monitor_load_average, save_load_average_metric};
+use crate::memory::{monitor_memory, save_memory_metric};
 
 #[async_std::main]
 async fn main() {
@@ -54,6 +56,11 @@ async fn main() {
         match monitor_load_average().await {
             Ok(v) => save_load_average_metric(&database, hostname.clone(), v).await,
             Err(err) => warn!("failed to record load average metric: {}", err)
+        };
+
+        match monitor_memory().await {
+            Ok(v) => save_memory_metric(&database, &hostname, &v).await,
+            Err(err) => warn!("failed to record memory metric: {}", err)
         };
     }
 }
