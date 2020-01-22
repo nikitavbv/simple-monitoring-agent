@@ -14,7 +14,7 @@ use std::env;
 use async_std::task;
 use log::{info, warn};
 
-use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric};
+use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric, get_cpu_latest_insert};
 use crate::database::connect;
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
@@ -25,7 +25,7 @@ async fn main() {
     env::set_var("RUST_LOG", "agent=debug");
     env_logger::init();
 
-    let database = connect().await
+    let mut database = connect().await
         .expect("failed to connect to database");
 
     let hostname = get_hostname();
@@ -44,6 +44,7 @@ async fn main() {
                     let metric = cpu_metric_from_stats(previous_cpu_stat.unwrap(), v.clone());
                     save_cpu_metric(database.clone(), hostname.clone(), metric).await;
                     info!("cpu metric record is saved");
+                    info!("cpu metric latest insert: {:?}", get_cpu_latest_insert(&mut database).await);
                 }
                 previous_cpu_stat = Ok(v);
             },

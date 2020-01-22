@@ -6,6 +6,7 @@ use async_std::fs::read_to_string;
 use custom_error::custom_error;
 use futures::future::join_all;
 use chrono::{Utc, DateTime, Duration};
+use sqlx::error::Error as SQLXError;
 
 use crate::database::Database;
 
@@ -151,4 +152,10 @@ async fn save_metric_entry(mut database: Database, hostname: &str, timestamp: Da
         entry.iowait as i32, entry.irq as i32, entry.softirq as i32, entry.guest as i32, entry.steal as i32,
         entry.guest_nice as i32
     ).fetch_one(&mut database).await;
+}
+
+pub async fn get_cpu_latest_insert(mut database: &Database) -> Result<DateTime<Utc>, SQLXError> {
+    sqlx::query!(
+        "select timestamp from metric_cpu order by timestamp desc limit 1"
+    ).fetch_one(&mut database).await.map(|r| r.timestamp)
 }
