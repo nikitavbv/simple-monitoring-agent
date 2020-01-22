@@ -24,3 +24,15 @@ create table metric_load_average
 	fifteen double precision not null
 );
 
+create table metric_memory
+(
+    hostname text not null,
+    timestamp timestamp with time zone,
+    total bigint,
+    free bigint,
+    available bigint,
+    buffers bigint,
+    cached bigint,
+    swap_total bigint,
+    swap_free bigint
+);
