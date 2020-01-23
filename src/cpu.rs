@@ -57,8 +57,7 @@ pub struct CPUMetricEntry {
 custom_error!{pub CPUMetricError
     FailedToRead{source: std::io::Error} = "failed to read metric",
     FailedToParse = "failed to parse metric",
-    FailedToGetTimeDiff{source: std::time::SystemTimeError} = "failed to get time diff",
-    DatabaseConnectionError = "failed to connect to database",
+    FailedToGetTimeDiff{source: std::time::SystemTimeError} = "failed to get time diff"
 }
 
 impl From<std::option::NoneError> for CPUMetricError {

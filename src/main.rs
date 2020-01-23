@@ -6,6 +6,7 @@ mod config;
 mod cpu;
 mod database;
 mod hostname;
+mod io;
 mod load_avg;
 mod memory;
 
@@ -21,6 +22,7 @@ use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::{monitor_load_average, save_load_average_metric};
 use crate::memory::{monitor_memory, save_memory_metric};
+use crate::io::{monitor_io, io_metric_from_stats, save_io_metric};
 
 #[async_std::main]
 async fn main() {
@@ -33,6 +35,7 @@ async fn main() {
     let hostname = get_hostname();
 
     let mut previous_cpu_stat = monitor_cpu_usage().await;
+    let mut previous_io_stat = monitor_io().await;
 
     info!("ready");
 
@@ -72,6 +75,17 @@ async fn main() {
             Ok(v) => save_memory_metric(&database, &hostname, &v).await,
             Err(err) => warn!("failed to record memory metric: {}", err)
         };
+
+        match monitor_io().await {
+            Ok(v) => {
+                if previous_io_stat.is_ok() {
+                    let metric = io_metric_from_stats(previous_io_stat.unwrap(), v.clone());
+                    save_io_metric(&database, &hostname, &metric).await;
+                }
+                previous_io_stat = Ok(v);
+            },
+            Err(err) => warn!("failed to get io stats: {}", err)
+        }
     }
 }
 

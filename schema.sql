@@ -36,3 +36,12 @@ create table metric_memory
     swap_total bigint,
     swap_free bigint
 );
+
+create table metric_io
+(
+    hostname text not null,
+    timestamp timestamp with time zone not null,
+    device text not null,
+    read double precision not null,
+    write double precision not null
+);
