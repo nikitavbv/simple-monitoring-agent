@@ -16,7 +16,7 @@ use async_std::task;
 use log::{info, warn};
 
 use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric, get_cpu_latest_insert};
-use crate::database::connect;
+use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::{monitor_load_average, save_load_average_metric};
@@ -39,6 +39,16 @@ async fn main() {
     loop {
         info!("sleeping for {} seconds until next iteration", get_metric_report_interval());
         task::sleep(Duration::from_secs(get_metric_report_interval() as u64)).await;
+
+        if !check_if_database_connection_is_live(&database).await {
+            warn!("database connection is not live, reconnecting...");
+
+            database = connect().await.expect("failed to connect to database");
+            if !check_if_database_connection_is_live(&database).await {
+                warn!("database connection is not live after reconnect. Exiting... Hopefully we will be restarted.");
+                return;
+            }
+        }
 
         match monitor_cpu_usage().await {
             Ok(v) => {
@@ -63,4 +73,8 @@ async fn main() {
             Err(err) => warn!("failed to record memory metric: {}", err)
         };
     }
+}
+
+async fn check_if_database_connection_is_live(mut database: &Database) -> bool {
+    sqlx::query!("SELECT 'DBD::Pg ping test' as ping_response").fetch_one(&mut database).await.is_ok()
 }
