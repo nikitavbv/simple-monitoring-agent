@@ -159,9 +159,3 @@ async fn save_metric_entry(mut database: Database, hostname: &str, timestamp: Da
         warn!("failed to insert cpu metric to database: {}", res.err().unwrap());
     }
 }
-
-pub async fn get_cpu_latest_insert(mut database: &Database) -> Result<DateTime<Utc>, SQLXError> {
-    sqlx::query!(
-        "select timestamp from metric_cpu order by timestamp desc limit 1"
-    ).fetch_one(&mut database).await.map(|r| r.timestamp)
-}

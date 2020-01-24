@@ -58,8 +58,6 @@ async fn main() {
                 if previous_cpu_stat.is_ok() {
                     let metric = cpu_metric_from_stats(previous_cpu_stat.unwrap(), v.clone());
                     save_cpu_metric(database.clone(), hostname.clone(), metric).await;
-                    info!("cpu metric record is saved");
-                    info!("cpu metric latest insert: {:?}", get_cpu_latest_insert(&mut database).await);
                 }
                 previous_cpu_stat = Ok(v);
             },
