@@ -54,3 +54,12 @@ create table metric_fs
     total bigint,
     used bigint
 );
+
+create table metric_network
+(
+    hostname text,
+    timestamp timestamp with time zone,
+    device text,
+    rx double precision,
+    tx double precision
+);

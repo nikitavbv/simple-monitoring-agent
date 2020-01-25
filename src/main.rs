@@ -10,6 +10,7 @@ mod hostname;
 mod io;
 mod load_avg;
 mod memory;
+mod network;
 
 use std::time::Duration;
 use std::env;
@@ -25,6 +26,7 @@ use crate::load_avg::{monitor_load_average, save_load_average_metric};
 use crate::memory::{monitor_memory, save_memory_metric};
 use crate::io::{monitor_io, io_metric_from_stats, save_io_metric};
 use crate::fs::{monitor_filesystem_usage, save_filesystem_usage_metric};
+use crate::network::{monitor_network, network_metric_from_stats, save_network_metric};
 
 #[async_std::main]
 async fn main() {
@@ -38,6 +40,7 @@ async fn main() {
 
     let mut previous_cpu_stat = monitor_cpu_usage().await;
     let mut previous_io_stat = monitor_io().await;
+    let mut previous_network_stat = monitor_network().await;
 
     info!("ready");
 
@@ -84,12 +87,23 @@ async fn main() {
                 previous_io_stat = Ok(v);
             },
             Err(err) => warn!("failed to get io stats: {}", err)
-        }
+        };
 
         match monitor_filesystem_usage().await {
             Ok(v) => save_filesystem_usage_metric(&database, &hostname, &v).await,
             Err(err) => warn!("failed to record filesystem usage metric: {}", err)
-        }
+        };
+
+        match monitor_network().await {
+            Ok(v) => {
+                if previous_network_stat.is_ok() {
+                    let metric = network_metric_from_stats(&previous_network_stat.unwrap(), &v);
+                    save_network_metric(&database, &hostname, &metric).await;
+                }
+                previous_network_stat = Ok(v);
+            },
+            Err(err) => warn!("failed to get network stats: {}", err)
+        };
     }
 }
 
