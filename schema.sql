@@ -45,3 +45,12 @@ create table metric_io
     read double precision not null,
     write double precision not null
 );
+
+create table metric_fs
+(
+    hostname text,
+    timestamp timestamp with time zone,
+    filesystem text,
+    total bigint,
+    used bigint
+);
