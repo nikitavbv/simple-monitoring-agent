@@ -5,6 +5,7 @@ extern crate custom_error;
 mod config;
 mod cpu;
 mod database;
+mod fs;
 mod hostname;
 mod io;
 mod load_avg;
@@ -16,13 +17,14 @@ use std::env;
 use async_std::task;
 use log::{info, warn};
 
-use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric, get_cpu_latest_insert};
+use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric};
 use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::{monitor_load_average, save_load_average_metric};
 use crate::memory::{monitor_memory, save_memory_metric};
 use crate::io::{monitor_io, io_metric_from_stats, save_io_metric};
+use crate::fs::{monitor_filesystem_usage, save_filesystem_usage_metric};
 
 #[async_std::main]
 async fn main() {
@@ -83,6 +85,11 @@ async fn main() {
                 previous_io_stat = Ok(v);
             },
             Err(err) => warn!("failed to get io stats: {}", err)
+        }
+
+        match monitor_filesystem_usage().await {
+            Ok(v) => save_filesystem_usage_metric(&database, &hostname, &v).await,
+            Err(err) => warn!("failed to record filesystem usage metric: {}", err)
         }
     }
 }
