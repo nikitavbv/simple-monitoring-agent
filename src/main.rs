@@ -42,7 +42,6 @@ async fn main() {
     info!("ready");
 
     loop {
-        info!("sleeping for {} seconds until next iteration", get_metric_report_interval());
         task::sleep(Duration::from_secs(get_metric_report_interval() as u64)).await;
 
         if !check_if_database_connection_is_live(&database).await {
