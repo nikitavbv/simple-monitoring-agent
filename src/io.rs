@@ -58,7 +58,7 @@ impl From<std::num::ParseIntError> for IOMetricError {
 // Block size according to:
 // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
 // /tree/include/linux/types.h?id=v4.4-rc6#n121
-const device_block_size: i32 = 512;
+const DEVICE_BLOCK_SIZE: i32 = 512;
 
 pub async fn monitor_io() -> Result<IOStat, IOMetricError> {
     let timestamp = Utc::now();
@@ -106,8 +106,8 @@ pub fn io_metric_from_stats(first: IOStat, second: IOStat) -> IOMetric {
 fn io_metric_entry_from_two_stats(time_diff: Duration, first: IOStatEntry, second: IOStatEntry) -> IOMetricEntry {
     let diff = time_diff.num_milliseconds() as f64 / 1000.0; // seconds
 
-    let read = ((second.sectors_read - first.sectors_read) * device_block_size as u64) as f64 / diff;
-    let write = ((second.sectors_written - first.sectors_written) * device_block_size as u64) as f64 / diff;
+    let read = ((second.sectors_read - first.sectors_read) * DEVICE_BLOCK_SIZE as u64) as f64 / diff;
+    let write = ((second.sectors_written - first.sectors_written) * DEVICE_BLOCK_SIZE as u64) as f64 / diff;
 
     IOMetricEntry {
         device: second.device_name,
