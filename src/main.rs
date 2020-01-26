@@ -5,18 +5,21 @@ extern crate custom_error;
 mod config;
 mod cpu;
 mod database;
+mod docker;
 mod fs;
 mod hostname;
 mod io;
 mod load_avg;
 mod memory;
 mod network;
+mod nginx;
 
 use std::time::Duration;
 use std::env;
 
 use async_std::task;
 use log::{info, warn};
+use tokio::prelude::*;
 
 use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric};
 use crate::database::{connect, Database};
@@ -27,8 +30,10 @@ use crate::memory::{monitor_memory, save_memory_metric};
 use crate::io::{monitor_io, io_metric_from_stats, save_io_metric};
 use crate::fs::{monitor_filesystem_usage, save_filesystem_usage_metric};
 use crate::network::{monitor_network, network_metric_from_stats, save_network_metric};
+use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric};
+use crate::nginx::{monitor_nginx, nginx_metric_from_stats, save_nginx_metric};
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     env::set_var("RUST_LOG", "agent=debug");
     env_logger::init();
@@ -41,6 +46,8 @@ async fn main() {
     let mut previous_cpu_stat = monitor_cpu_usage().await;
     let mut previous_io_stat = monitor_io().await;
     let mut previous_network_stat = monitor_network().await;
+    let mut previous_docker_stat = monitor_docker().await;
+    let mut previous_nginx_stat = monitor_nginx().await;
 
     info!("ready");
 
@@ -104,6 +111,28 @@ async fn main() {
             },
             Err(err) => warn!("failed to get network stats: {}", err)
         };
+
+        match monitor_docker().await {
+            Ok(v) => {
+                if previous_docker_stat.is_ok() {
+                    let metric = docker_metric_from_stats(&previous_docker_stat.unwrap(), &v);
+                    save_docker_metric(&database, &hostname, &metric).await;
+                }
+                previous_docker_stat = Ok(v);
+            },
+            Err(err) => warn!("failed to get docker stats: {}", err)
+        };
+
+        match monitor_nginx().await {
+            Ok(v) => {
+                if previous_nginx_stat.is_ok() {
+                    let metric = nginx_metric_from_stats(&previous_nginx_stat.unwrap(), &v);
+                    save_nginx_metric(&database, &hostname, &metric).await;
+                }
+                previous_nginx_stat = Ok(v);
+            },
+            Err(err) => warn!("failed to get nginx stats: {}", err)
+        }
     }
 }
 

@@ -63,3 +63,23 @@ create table metric_network
     rx double precision,
     tx double precision
 );
+
+create table metric_docker_containers
+(
+    hostname text not null,
+    timestamp timestamp with time zone not null,
+    name text,
+    state text not null,
+    cpu_usage double precision not null,
+    memory_usage bigint not null,
+    memory_cache bigint not null,
+    network_tx double precision not null,
+    network_rx double precision not null
+);
+
+create table metric_nginx
+(
+    hostname text not null,
+    timestamp timestamp with time zone not null,
+    handled_requests integer not null
+);

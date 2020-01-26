@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 async-std = { version = "1.4.0", features = [ "attributes" ] }
+tokio = { version = "0.2.10", features = [ "rt-core", "macros" ] }
 custom_error = "1.7.1"
 sqlx = { version = "0.2.4", features = [ "postgres", "chrono" ] }
 openssl = { version = "0.10.26", features = [ "vendored" ] }
@@ -15,3 +16,9 @@ futures = "0.3.1"
 chrono = "0.4.10"
 log = "0.4.8"
 env_logger = "0.7.1"
+http = "0.2.0"
+hyper = "0.13.1"
+hyperlocal = { git = "https://github.com/softprops/hyperlocal" }
+serde = { version = "1.0.104", features = [ "derive" ] }
+serde_json = "1.0.45"
+reqwest = { version = "0.10.1", features = [ "json", "rustls-tls" ] }
