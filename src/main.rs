@@ -13,6 +13,7 @@ mod load_avg;
 mod memory;
 mod network;
 mod nginx;
+mod postgres;
 
 use std::time::Duration;
 use std::env;
@@ -32,6 +33,7 @@ use crate::fs::{monitor_filesystem_usage, save_filesystem_usage_metric};
 use crate::network::{monitor_network, network_metric_from_stats, save_network_metric};
 use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric};
 use crate::nginx::{monitor_nginx, nginx_metric_from_stats, save_nginx_metric};
+use crate::postgres::{monitor_postgres, postgres_metric_from_stats, save_postgres_metric};
 
 #[tokio::main]
 async fn main() {
@@ -48,6 +50,7 @@ async fn main() {
     let mut previous_network_stat = monitor_network().await;
     let mut previous_docker_stat = monitor_docker().await;
     let mut previous_nginx_stat = monitor_nginx().await;
+    let mut previous_postgres_stat = monitor_postgres(&database).await;
 
     info!("ready");
 
@@ -132,6 +135,17 @@ async fn main() {
                 previous_nginx_stat = Ok(v);
             },
             Err(err) => warn!("failed to get nginx stats: {}", err)
+        }
+
+        match monitor_postgres(&mut database).await {
+            Ok(v) => {
+                if previous_postgres_stat.is_ok() {
+                    let metric = postgres_metric_from_stats(&previous_postgres_stat.unwrap(), &v);
+                    save_postgres_metric(&database, &hostname, &metric).await;
+                }
+                previous_postgres_stat = Ok(v);
+            },
+            Err(err) => warn!("failed to get postgres stats: {}", err)
         }
     }
 }

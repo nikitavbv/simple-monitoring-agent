@@ -83,3 +83,23 @@ create table metric_nginx
     timestamp timestamp with time zone not null,
     handled_requests integer not null
 );
+
+create table metric_postgres_database
+(
+    hostname text,
+    timestamp timestamp with time zone,
+    returned integer,
+    fetched integer,
+    inserted integer,
+    updated integer,
+    deleted integer
+);
+
+create table metric_postgres_tables
+(
+    hostname text not null,
+    timestamp timestamp with time zone not null,
+    name text not null,
+    rows integer not null,
+    total_bytes bigint not null
+);
