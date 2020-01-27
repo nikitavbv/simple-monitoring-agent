@@ -7,6 +7,8 @@ use custom_error::custom_error;
 use futures::future::join_all;
 
 use crate::database::Database;
+use tokio::stream::StreamExt;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct FilesystemUsageMetric {
@@ -42,17 +44,7 @@ pub async fn monitor_filesystem_usage() -> Result<FilesystemUsageMetric, Filesys
     let timestamp = Utc::now();
 
     let stat = String::from_utf8_lossy(
-        &Command::new("df")
-            .arg("-x")
-            .arg("squashfs")
-            .arg("-x")
-            .arg("devtmpfs")
-            .arg("-x")
-            .arg("tmpfs")
-            .arg("-x")
-            .arg("fuse")
-            .arg("--output=source,size,used")
-            .output()?.stdout
+        &Command::new("df").output()?.stdout
     )
         .lines()
         .skip(1)
@@ -63,6 +55,11 @@ pub async fn monitor_filesystem_usage() -> Result<FilesystemUsageMetric, Filesys
             used: line.next()?.parse()?
         }))
         .filter_map(|v: Result<FilesystemUsageMetricEntry, FilesystemUsageMetricError>| v.ok())
+        .filter(|v| v.filesystem != "tmpfs" && v.filesystem != "overlay" && v.filesystem != "shm")
+        .map(|v| (v.filesystem.clone(), v))
+        .collect::<HashMap<String, FilesystemUsageMetricEntry>>() // deduplicate
+        .into_iter()
+        .map(|v| v.1)
         .collect();
 
     Ok(FilesystemUsageMetric { timestamp, stat })
