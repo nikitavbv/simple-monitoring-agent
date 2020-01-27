@@ -11,6 +11,7 @@ use log::warn;
 
 use crate::database::Database;
 use std::error::Error;
+use std::env;
 
 #[derive(Debug, Clone)]
 pub struct NetworkStat {
@@ -55,10 +56,14 @@ impl From<std::num::ParseIntError> for NetworkMetricError {
     }
 }
 
+fn network_stats_file_name() -> String {
+    env::var("NETWORK_STATS_FILE").unwrap_or("/proc/net/dev".to_string())
+}
+
 pub async fn monitor_network() -> Result<NetworkStat, NetworkMetricError> {
     let timestamp = Utc::now();
 
-    let stat = read_to_string("/proc/net/dev").await?.lines()
+    let stat = read_to_string(&network_stats_file_name()).await?.lines()
         .skip(2)
         .map(|line| line.split_whitespace())
         .map(|spl: SplitWhitespace| {
