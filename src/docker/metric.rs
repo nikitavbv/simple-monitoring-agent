@@ -1,7 +1,3 @@
-use std::option::NoneError;
-use std::num::ParseIntError;
-use std::process::Command;
-
 use chrono::{Utc, DateTime, Duration};
 use custom_error::custom_error;
 use futures::future::join_all;
@@ -9,7 +5,7 @@ use log::warn;
 
 use crate::database::Database;
 use crate::docker::client::{containers, DockerClientError, stats, Container, ContainerStats};
-use futures::{FutureExt, StreamExt};
+use futures::FutureExt;
 
 #[derive(Debug, Clone)]
 pub struct DockerContainerStats {
@@ -53,13 +49,8 @@ pub struct DockerContainerMetricEntry {
 }
 
 custom_error!{pub DockerMetricError
-    DockerClientError = "docker client error"
-}
-
-impl From<DockerClientError> for DockerMetricError {
-    fn from(err: DockerClientError) -> Self {
-        DockerMetricError::DockerClientError
-    }
+    DockerClientError{source: DockerClientError} = "docker client error",
+    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
 }
 
 pub async fn monitor_docker() -> Result<DockerContainerStats, DockerMetricError> {
@@ -131,14 +122,16 @@ pub async fn save_docker_metric(mut database: &Database, hostname: &str, metric:
     let timestamp = metric.timestamp.clone();
 
     let futures = metric.stat.into_iter()
-        .map(|entry| save_metric_entry(&database, hostname, &timestamp, entry));
+        .map(|entry| save_metric_entry(&mut database, hostname, &timestamp, entry));
 
     join_all(futures).await;
 }
 
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: DockerContainerMetricEntry) {
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: DockerContainerMetricEntry) -> Result<(), DockerMetricError> {
     sqlx::query!(
         "insert into metric_docker_containers (hostname, timestamp, name, state, cpu_usage, memory_usage, memory_cache, network_tx, network_rx) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning name",
         hostname.to_string(), *timestamp, entry.name, entry.state, entry.cpu_usage, entry.memory_usage as i64, entry.memory_cache as i64, entry.network_tx, entry.network_rx
-    ).fetch_one(&mut database).await;
+    ).fetch_one(&mut database).await?;
+
+    Ok(())
 }

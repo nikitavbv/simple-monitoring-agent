@@ -10,7 +10,6 @@ use sqlx::error::Error as SQLXError;
 use log::warn;
 
 use crate::database::Database;
-use std::error::Error;
 
 #[derive(Debug, Clone)]
 pub struct CPUStat  {
@@ -56,19 +55,19 @@ pub struct CPUMetricEntry {
 
 custom_error!{pub CPUMetricError
     FailedToRead{source: std::io::Error} = "failed to read metric",
-    FailedToParse = "failed to parse metric",
+    FailedToParse{description: String} = "failed to parse metric",
     FailedToGetTimeDiff{source: std::time::SystemTimeError} = "failed to get time diff"
 }
 
 impl From<std::option::NoneError> for CPUMetricError {
-    fn from(err: NoneError) -> Self {
-        CPUMetricError::FailedToParse
+    fn from(_: NoneError) -> Self {
+        CPUMetricError::FailedToParse{description: "NoneError".to_string()}
     }
 }
 
 impl From<std::num::ParseIntError> for CPUMetricError {
     fn from(err: ParseIntError) -> Self {
-        CPUMetricError::FailedToParse
+        CPUMetricError::FailedToParse{description: err.to_string()}
     }
 }
 
@@ -137,16 +136,16 @@ fn cpu_metric_entry_from_two_stats(time_diff: Duration, first: CPUStatEntry, sec
     }
 }
 
-pub async fn save_cpu_metric(mut database: Database, hostname: String, metric: CPUMetric) {
+pub async fn save_cpu_metric(database: &Database, hostname: &str, metric: CPUMetric) {
     let timestamp = metric.timestamp.clone();
 
     let futures = metric.stat.into_iter()
-        .map(|entry| save_metric_entry(database.clone(), &hostname, timestamp, entry));
+        .map(|entry| save_metric_entry(database, &hostname, timestamp, entry));
 
     join_all(futures).await;
 }
 
-async fn save_metric_entry(mut database: Database, hostname: &str, timestamp: DateTime<Utc>, entry: CPUMetricEntry) {
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: CPUMetricEntry) {
     let res: Result<_, SQLXError> = sqlx::query!(
         "insert into metric_cpu (hostname, timestamp, cpu, \"user\", nice, system, idle, iowait, irq, softirq, guest, steal, guest_nice) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning cpu",
         hostname.to_string(), timestamp,

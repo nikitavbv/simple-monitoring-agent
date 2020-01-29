@@ -6,11 +6,8 @@ use async_std::fs::read_to_string;
 use custom_error::custom_error;
 use futures::future::join_all;
 use chrono::{Utc, DateTime, Duration};
-use sqlx::error::Error as SQLXError;
-use log::warn;
 
 use crate::database::Database;
-use std::error::Error;
 
 #[derive(Debug, Clone)]
 pub struct IOStat {
@@ -40,18 +37,19 @@ pub struct IOMetricEntry {
 
 custom_error!{pub IOMetricError
     FailedToRead{source: std::io::Error} = "failed to read metric",
-    FailedToParse = "failed to parse metric"
+    FailedToParse{description: String} = "failed to parse metric",
+    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
 }
 
 impl From<std::option::NoneError> for IOMetricError {
-    fn from(err: NoneError) -> Self {
-        IOMetricError::FailedToParse
+    fn from(_: NoneError) -> Self {
+        IOMetricError::FailedToParse{description: "NoneError".to_string()}
     }
 }
 
 impl From<std::num::ParseIntError> for IOMetricError {
     fn from(err: ParseIntError) -> Self {
-        IOMetricError::FailedToParse
+        IOMetricError::FailedToParse{description: err.to_string()}
     }
 }
 
@@ -66,7 +64,7 @@ pub async fn monitor_io() -> Result<IOStat, IOMetricError> {
     let stat = read_to_string("/proc/diskstats").await?.lines()
         .map(|line| line.split_whitespace())
         .map(|s: SplitWhitespace| {
-            let mut spl = s.clone();
+            let spl = s.clone();
             let mut spl = spl.skip(2);
 
             let device_name = spl.next()?.to_string();
@@ -116,7 +114,7 @@ fn io_metric_entry_from_two_stats(time_diff: Duration, first: IOStatEntry, secon
     }
 }
 
-pub async fn save_io_metric(mut database: &Database, hostname: &str, metric: &IOMetric) {
+pub async fn save_io_metric(database: &Database, hostname: &str, metric: &IOMetric) {
     let metric = metric.clone();
 
     let timestamp = metric.timestamp.clone();
@@ -127,9 +125,11 @@ pub async fn save_io_metric(mut database: &Database, hostname: &str, metric: &IO
     join_all(futures).await;
 }
 
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: IOMetricEntry) {
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: IOMetricEntry) -> Result<(), IOMetricError> {
     sqlx::query!(
         "insert into metric_io (hostname, timestamp, device, read, write) values ($1, $2, $3, $4, $5) returning hostname",
         hostname.to_string(), *timestamp, entry.device.to_string(), entry.read, entry.write
-    ).fetch_one(&mut database).await;
+    ).fetch_one(&mut database).await?;
+
+    Ok(())
 }

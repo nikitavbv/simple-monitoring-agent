@@ -1,13 +1,9 @@
-use std::str::{SplitWhitespace, FromStr};
 use std::option::NoneError;
 use std::num::ParseIntError;
 use std::env;
 
 use chrono::{Utc, DateTime};
-use hyper::{Client, Uri};
 use custom_error::custom_error;
-use futures::TryStreamExt;
-use log::warn;
 
 use crate::database::Database;
 
@@ -26,26 +22,31 @@ pub struct NginxMetric {
 custom_error!{pub NginxMetricError
     NotConfigured = "nginx status endpoint is not set",
     RequestFailed{source: reqwest::Error} = "failed to request nginx status: {source}",
-    FailedToParse = "failed to parse metric"
+    FailedToParse{description: String} = "failed to parse metric",
+    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
 }
 
 impl From<std::option::NoneError> for NginxMetricError {
-    fn from(err: NoneError) -> Self {
-        warn!("err: {:?}", err);
-        NginxMetricError::FailedToParse
+    fn from(_: NoneError) -> Self {
+        NginxMetricError::FailedToParse {
+            description: "NoneError".to_string()
+        }
     }
 }
 
 impl From<std::num::ParseIntError> for NginxMetricError {
     fn from(err: ParseIntError) -> Self {
-        warn!("err: {:?}", err);
-        NginxMetricError::FailedToParse
+        NginxMetricError::FailedToParse {
+            description: err.to_string()
+        }
     }
 }
 
 impl From<http::uri::InvalidUri> for NginxMetricError {
     fn from(err: http::uri::InvalidUri) -> Self {
-        NginxMetricError::FailedToParse
+        NginxMetricError::FailedToParse {
+            description: err.to_string()
+        }
     }
 }
 
@@ -79,9 +80,11 @@ pub fn nginx_metric_from_stats(first: &NginxStat, second: &NginxStat) -> NginxMe
     }
 }
 
-pub async fn save_nginx_metric(mut database: &Database, hostname: &str, metric: &NginxMetric) {
+pub async fn save_nginx_metric(mut database: &Database, hostname: &str, metric: &NginxMetric) -> Result<(), NginxMetricError> {
     sqlx::query!(
         "insert into metric_nginx (hostname, timestamp, handled_requests) values ($1, $2, $3) returning hostname",
         hostname.to_string(), metric.timestamp, metric.handled_requests as i32
-    ).fetch_one(&mut database).await;
+    ).fetch_one(&mut database).await?;
+
+    Ok(())
 }

@@ -7,7 +7,6 @@ use custom_error::custom_error;
 use futures::future::join_all;
 
 use crate::database::Database;
-use tokio::stream::StreamExt;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -25,18 +24,19 @@ pub struct FilesystemUsageMetricEntry {
 
 custom_error!{pub FilesystemUsageMetricError
     FailedToRead{source: std::io::Error} = "failed to read metric",
-    FailedToParse = "failed to parse metric"
+    FailedToParse{description: String} = "failed to parse metric",
+    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
 }
 
 impl From<std::option::NoneError> for FilesystemUsageMetricError {
-    fn from(err: NoneError) -> Self {
-        FilesystemUsageMetricError::FailedToParse
+    fn from(_: NoneError) -> Self {
+        FilesystemUsageMetricError::FailedToParse{description: "NoneError".to_string()}
     }
 }
 
 impl From<std::num::ParseIntError> for FilesystemUsageMetricError {
     fn from(err: ParseIntError) -> Self {
-        FilesystemUsageMetricError::FailedToParse
+        FilesystemUsageMetricError::FailedToParse{description: err.to_string()}
     }
 }
 
@@ -65,7 +65,7 @@ pub async fn monitor_filesystem_usage() -> Result<FilesystemUsageMetric, Filesys
     Ok(FilesystemUsageMetric { timestamp, stat })
 }
 
-pub async fn save_filesystem_usage_metric(mut database: &Database, hostname: &str, metric: &FilesystemUsageMetric) {
+pub async fn save_filesystem_usage_metric(database: &Database, hostname: &str, metric: &FilesystemUsageMetric) {
     let metric = metric.clone();
     let timestamp = metric.timestamp.clone();
 
@@ -75,9 +75,11 @@ pub async fn save_filesystem_usage_metric(mut database: &Database, hostname: &st
     join_all(futures).await;
 }
 
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: FilesystemUsageMetricEntry) {
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: FilesystemUsageMetricEntry) -> Result<(), FilesystemUsageMetricError> {
     sqlx::query!(
         "insert into metric_fs (hostname, timestamp, filesystem, total, used) values ($1, $2, $3, $4, $5)",
         hostname.to_string(), timestamp, entry.filesystem, entry.total, entry.used
-    ).fetch_one(&mut database).await;
+    ).fetch_one(&mut database).await?;
+
+    Ok(())
 }

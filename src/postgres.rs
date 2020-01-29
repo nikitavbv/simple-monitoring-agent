@@ -1,6 +1,6 @@
 use std::env;
 
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Utc};
 use futures::future::{join, join_all};
 use futures::{TryFutureExt, TryStreamExt};
 use custom_error::custom_error;
@@ -55,13 +55,7 @@ pub struct TableMetric {
 
 custom_error!{pub PostgresMetricError
     NotConfigured = "database to monitor not set",
-    DatabaseQueryFailed = "database query failed"
-}
-
-impl From<sqlx::error::Error> for PostgresMetricError {
-    fn from(err: sqlx::error::Error) -> Self {
-        PostgresMetricError::DatabaseQueryFailed
-    }
+    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
 }
 
 fn get_postgres_database_name() -> Option<String> {
@@ -135,7 +129,7 @@ fn table_metric_from_two_stats(first: &DatabaseStat, second: &DatabaseStat) -> D
     }
 }
 
-pub async fn save_postgres_metric(mut database: &Database, hostname: &str, metric: &PostgresMetric) {
+pub async fn save_postgres_metric(database: &Database, hostname: &str, metric: &PostgresMetric) {
     let metric = metric.clone();
 
     let timestamp = metric.timestamp.clone();

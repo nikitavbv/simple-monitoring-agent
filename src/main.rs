@@ -20,7 +20,6 @@ use std::env;
 
 use async_std::task;
 use log::{info, warn};
-use tokio::prelude::*;
 
 use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric};
 use crate::database::{connect, Database};
@@ -71,7 +70,7 @@ async fn main() {
             Ok(v) => {
                 if previous_cpu_stat.is_ok() {
                     let metric = cpu_metric_from_stats(previous_cpu_stat.unwrap(), v.clone());
-                    save_cpu_metric(database.clone(), hostname.clone(), metric).await;
+                    save_cpu_metric(&database, &hostname, metric).await;
                 }
                 previous_cpu_stat = Ok(v);
             },
@@ -79,8 +78,11 @@ async fn main() {
         };
 
         match monitor_load_average().await {
-            Ok(v) => save_load_average_metric(&database, hostname.clone(), v).await,
-            Err(err) => warn!("failed to record load average metric: {}", err)
+            Ok(v) => match save_load_average_metric(&database, hostname.clone(), v).await {
+                Ok(_) => {},
+                Err(err) => warn!("failed to record load average metric: {}", err)
+            }
+            Err(err) => warn!("failed to collect load average metric: {}", err)
         };
 
         match monitor_memory().await {
@@ -119,7 +121,7 @@ async fn main() {
             Ok(v) => {
                 if previous_docker_stat.is_ok() {
                     let metric = docker_metric_from_stats(&previous_docker_stat.unwrap(), &v);
-                    save_docker_metric(&database, &hostname, &metric).await;
+                    save_docker_metric(&mut database, &hostname, &metric).await;
                 }
                 previous_docker_stat = Ok(v);
             },

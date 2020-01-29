@@ -1,6 +1,6 @@
 use hyper::{Method, Request, Body, Client};
-use hyperlocal::{UnixConnector, Uri, UnixClientExt};
-use futures::{StreamExt, TryStreamExt};
+use hyperlocal::{Uri, UnixClientExt};
+use futures::TryStreamExt;
 use custom_error::custom_error;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -12,19 +12,19 @@ custom_error! {pub DockerClientError
 }
 
 impl From<hyper::error::Error> for DockerClientError {
-    fn from(err: hyper::error::Error) -> Self {
+    fn from(_err: hyper::error::Error) -> Self {
         DockerClientError::RequestToDockerFailed
     }
 }
 
 impl From<http::Error> for DockerClientError {
-    fn from(err: http::Error) -> Self {
+    fn from(_err: http::Error) -> Self {
         DockerClientError::RequestToDockerFailed
     }
 }
 
 impl From<serde_json::error::Error> for DockerClientError {
-    fn from(err: serde_json::error::Error) -> Self {
+    fn from(_err: serde_json::error::Error) -> Self {
         DockerClientError::RequestToDockerFailed
     }
 }

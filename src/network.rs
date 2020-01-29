@@ -6,11 +6,8 @@ use async_std::fs::read_to_string;
 use custom_error::custom_error;
 use futures::future::join_all;
 use chrono::{Utc, DateTime, Duration};
-use sqlx::error::Error as SQLXError;
-use log::warn;
 
 use crate::database::Database;
-use std::error::Error;
 use std::env;
 
 #[derive(Debug, Clone)]
@@ -41,18 +38,18 @@ pub struct NetworkMetricEntry {
 
 custom_error!{pub NetworkMetricError
     FailedToRead{source: std::io::Error} = "failed to read metric",
-    FailedToParse = "failed to parse metric"
+    FailedToParse{description: String} = "failed to parse metric"
 }
 
 impl From<std::option::NoneError> for NetworkMetricError {
-    fn from(err: NoneError) -> Self {
-        NetworkMetricError::FailedToParse
+    fn from(_: NoneError) -> Self {
+        NetworkMetricError::FailedToParse{description: "NoneError".to_string()}
     }
 }
 
 impl From<std::num::ParseIntError> for NetworkMetricError {
     fn from(err: ParseIntError) -> Self {
-        NetworkMetricError::FailedToParse
+        NetworkMetricError::FailedToParse{description: err.to_string()}
     }
 }
 
@@ -114,7 +111,7 @@ fn network_metric_from_two_stats(time_diff: Duration, first: NetworkStatEntry, s
     }
 }
 
-pub async fn save_network_metric(mut database: &Database, hostname: &str, metric: &NetworkMetric) {
+pub async fn save_network_metric(database: &Database, hostname: &str, metric: &NetworkMetric) {
     let metric = metric.clone();
     let timestamp = metric.timestamp.clone();
 
@@ -124,9 +121,11 @@ pub async fn save_network_metric(mut database: &Database, hostname: &str, metric
     join_all(futures).await;
 }
 
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: NetworkMetricEntry) {
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: NetworkMetricEntry) -> Result<(), NetworkMetricEntryError> {
     sqlx::query!(
         "insert into metric_network (hostname, timestamp, device, rx, tx) values ($1, $2, $3, $4, $5)",
         hostname.to_string(), *timestamp, entry.device.to_string(), entry.rx, entry.tx
-    ).fetch_one(&mut database).await;
+    ).fetch_one(&mut database).await?;
+
+    Ok(())
 }
