@@ -86,8 +86,11 @@ async fn main() {
         };
 
         match monitor_memory().await {
-            Ok(v) => save_memory_metric(&database, &hostname, &v).await,
-            Err(err) => warn!("failed to record memory metric: {}", err)
+            Ok(v) => match save_memory_metric(&database, &hostname, &v).await {
+                Ok(_) => {},
+                Err(err) => warn!("failed to record memory metric: {}", err)
+            }
+            Err(err) => warn!("failed to collect memory metric: {}", err)
         };
 
         match monitor_io().await {

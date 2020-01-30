@@ -38,7 +38,8 @@ pub struct NetworkMetricEntry {
 
 custom_error!{pub NetworkMetricError
     FailedToRead{source: std::io::Error} = "failed to read metric",
-    FailedToParse{description: String} = "failed to parse metric"
+    FailedToParse{description: String} = "failed to parse metric",
+    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
 }
 
 impl From<std::option::NoneError> for NetworkMetricError {
@@ -121,7 +122,7 @@ pub async fn save_network_metric(database: &Database, hostname: &str, metric: &N
     join_all(futures).await;
 }
 
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: NetworkMetricEntry) -> Result<(), NetworkMetricEntryError> {
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: NetworkMetricEntry) -> Result<(), NetworkMetricError> {
     sqlx::query!(
         "insert into metric_network (hostname, timestamp, device, rx, tx) values ($1, $2, $3, $4, $5)",
         hostname.to_string(), *timestamp, entry.device.to_string(), entry.rx, entry.tx
