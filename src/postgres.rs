@@ -1,7 +1,7 @@
 use std::env;
 
 use chrono::{DateTime, Utc};
-use futures::future::{join, join_all};
+use futures::future::{try_join_all, try_join};
 use futures::{TryFutureExt, TryStreamExt};
 use custom_error::custom_error;
 
@@ -129,7 +129,7 @@ fn table_metric_from_two_stats(first: &DatabaseStat, second: &DatabaseStat) -> D
     }
 }
 
-pub async fn save_postgres_metric(database: &Database, hostname: &str, metric: &PostgresMetric) {
+pub async fn save_postgres_metric(database: &Database, hostname: &str, metric: &PostgresMetric) -> Result<(), PostgresMetricError> {
     let metric = metric.clone();
 
     let timestamp = metric.timestamp.clone();
@@ -137,22 +137,28 @@ pub async fn save_postgres_metric(database: &Database, hostname: &str, metric: &
     let futures = metric.table_metrics.into_iter()
         .map(|entry| save_table_metric_entry(&database, hostname, &timestamp, entry));
 
-    join(
-        join_all(futures),
+    try_join(
+        try_join_all(futures),
         save_database_metric(&database, hostname, &timestamp, metric.database_metric)
-    ).await;
+    ).await?;
+
+    Ok(())
 }
 
-async fn save_table_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: TableMetric) {
+async fn save_table_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: TableMetric) -> Result<(), PostgresMetricError> {
     sqlx::query!(
         "insert into metric_postgres_tables (hostname, timestamp, name, rows, total_bytes) values ($1, $2, $3, $4, $5) returning hostname",
         hostname.to_string(), *timestamp, entry.table, entry.rows, entry.total_bytes
-    ).fetch_one(&mut database).await;
+    ).fetch_one(&mut database).await?;
+
+    Ok(())
 }
 
-async fn save_database_metric(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: DatabaseMetric) {
+async fn save_database_metric(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: DatabaseMetric) -> Result<(), PostgresMetricError> {
     sqlx::query!(
         "insert into metric_postgres_database (hostname, timestamp, returned, fetched, inserted, updated, deleted) values ($1, $2, $3, $4, $5, $6, $7)",
         hostname.to_string(), *timestamp, entry.tup_returned, entry.tup_fetched, entry.tup_inserted, entry.tup_updated, entry.tup_deleted
-    ).fetch_one(&mut database).await;
+    ).fetch_one(&mut database).await?;
+
+    Ok(())
 }

@@ -135,7 +135,9 @@ async fn main() {
             Ok(v) => {
                 if previous_nginx_stat.is_ok() {
                     let metric = nginx_metric_from_stats(&previous_nginx_stat.unwrap(), &v);
-                    save_nginx_metric(&database, &hostname, &metric).await;
+                    if let Err(err) = save_nginx_metric(&database, &hostname, &metric).await {
+                        warn!("failed to record nginx metric: {}", err);
+                    }
                 }
                 previous_nginx_stat = Ok(v);
             },
@@ -146,7 +148,9 @@ async fn main() {
             Ok(v) => {
                 if previous_postgres_stat.is_ok() {
                     let metric = postgres_metric_from_stats(&previous_postgres_stat.unwrap(), &v);
-                    save_postgres_metric(&database, &hostname, &metric).await;
+                    if let Err(err) = save_postgres_metric(&database, &hostname, &metric).await {
+                        warn!("failed to record postgres metric: {}", err);
+                    }
                 }
                 previous_postgres_stat = Ok(v);
             },
