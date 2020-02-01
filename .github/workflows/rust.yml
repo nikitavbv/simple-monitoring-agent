@@ -27,6 +27,8 @@ jobs:
       run: rustup install nightly && rustup default nightly && cargo test
       env:
         DATABASE_URL: postgres://monitoring_ci_user:monitoring_ci_password@postgres:5432/monitoring        
+    - name: Clippy check
+      run: rustup component add clippy && cargo clippy --all-targets --all-features -- -D warnings
     - name: Build
       run: cargo build --release
       env:
