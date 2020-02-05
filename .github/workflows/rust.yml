@@ -46,6 +46,6 @@ jobs:
       uses: HurricanKai/Publish-Docker-Github-Action@master
       with:
         name: nikitavbv/monitoring_agent
-        registry: docker.pkg.github.com
+        registry: docker.io
         username: nikitavbv
         password: ${{ secrets.docker_hub_token }}
