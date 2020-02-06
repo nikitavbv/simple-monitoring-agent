@@ -69,7 +69,7 @@ pub async fn monitor_docker() -> Result<DockerContainerStats, DockerMetricError>
         state: v.0.state,
 
         cpu_usage: (v.1.cpu_stats.cpu_usage.total_usage / 1000) as u64,
-        system_cpu_usage: (v.1.cpu_stats.system_cpu_usage / 1000000) as u64,
+        system_cpu_usage: (v.1.cpu_stats.system_cpu_usage / 1_000_000) as u64,
 
         memory_usage: v.1.memory_stats.usage,
         memory_cache: v.1.memory_stats.stats.cache,
