@@ -4,7 +4,7 @@ use std::num::ParseIntError;
 
 use async_std::fs::read_to_string;
 use custom_error::custom_error;
-use futures::future::join_all;
+use futures::future::try_join_all;
 use chrono::{Utc, DateTime, Duration};
 use sqlx::error::Error as SQLXError;
 use log::warn;
@@ -53,10 +53,11 @@ pub struct CPUMetricEntry {
     guest_nice: u64,
 }
 
-custom_error!{pub CPUMetricError
+custom_error! {pub CPUMetricError
     FailedToRead{source: std::io::Error} = "failed to read metric",
     FailedToParse{description: String} = "failed to parse metric",
-    FailedToGetTimeDiff{source: std::time::SystemTimeError} = "failed to get time diff"
+    FailedToGetTimeDiff{source: std::time::SystemTimeError} = "failed to get time diff",
+    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
 }
 
 impl From<std::option::NoneError> for CPUMetricError {
@@ -136,25 +137,25 @@ fn cpu_metric_entry_from_two_stats(time_diff: Duration, first: CPUStatEntry, sec
     }
 }
 
-pub async fn save_cpu_metric(database: &Database, hostname: &str, metric: CPUMetric) {
+pub async fn save_cpu_metric(database: &Database, hostname: &str, metric: CPUMetric) -> Result<(), CPUMetricError> {
     let timestamp = metric.timestamp.clone();
 
     let futures = metric.stat.into_iter()
         .map(|entry| save_metric_entry(database, &hostname, timestamp, entry));
 
-    join_all(futures).await;
+    try_join_all(futures).await?;
+
+    Ok(())
 }
 
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: CPUMetricEntry) {
-    let res: Result<_, SQLXError> = sqlx::query!(
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: CPUMetricEntry) -> Result<(), CPUMetricError>{
+    sqlx::query!(
         "insert into metric_cpu (hostname, timestamp, cpu, \"user\", nice, system, idle, iowait, irq, softirq, guest, steal, guest_nice) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning cpu",
         hostname.to_string(), timestamp,
         entry.cpu as i32, entry.user as i32, entry.nice as i32, entry.system as i32, entry.idle as i32,
         entry.iowait as i32, entry.irq as i32, entry.softirq as i32, entry.guest as i32, entry.steal as i32,
         entry.guest_nice as i32
-    ).fetch_one(&mut database).await;
+    ).fetch_one(&mut database).await?;
 
-    if res.is_err() {
-        warn!("failed to insert cpu metric to database: {}", res.err().unwrap());
-    }
+    Ok(())
 }

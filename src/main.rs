@@ -70,7 +70,9 @@ async fn main() {
             Ok(v) => {
                 if previous_cpu_stat.is_ok() {
                     let metric = cpu_metric_from_stats(previous_cpu_stat.unwrap(), v.clone());
-                    save_cpu_metric(&database, &hostname, metric).await;
+                    if let Err(err) = save_cpu_metric(&database, &hostname, metric).await {
+                        warn!("failed to save cpu metric: {}", err);
+                    }
                 }
                 previous_cpu_stat = Ok(v);
             },
