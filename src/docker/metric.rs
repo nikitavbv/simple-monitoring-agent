@@ -93,6 +93,7 @@ pub fn docker_metric_from_stats(first: &DockerContainerStats, second: &DockerCon
             .find(|item| item.name == v.name)
             .map(|item| (item, v))
         )
+        .filter(|two_entries| two_entries.1.cpu_usage > two_entries.0.cpu_usage)
         .map(|two_entries| docker_metric_entry_from_two_stats(time_diff, two_entries.0, two_entries.1))
         .collect();
 
