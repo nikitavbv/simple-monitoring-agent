@@ -6,6 +6,7 @@ use chrono::{Utc, DateTime};
 use custom_error::custom_error;
 
 use crate::database::Database;
+use crate::config::get_max_metrics_age;
 
 pub struct LoadAverageMetric {
     timestamp: DateTime<Utc>,
@@ -51,6 +52,15 @@ pub async fn save_load_average_metric(mut database: &Database, hostname: String,
         "insert into metric_load_average (hostname, timestamp, one, five, fifteen) values ($1, $2, $3, $4, $5) returning hostname",
         hostname, metric.timestamp, metric.one, metric.five, metric.fifteen
     ).fetch_one(&mut database).await?;
+
+    Ok(())
+}
+
+pub async fn cleanup_load_average_metric(mut database: &Database) -> Result<(), LoadAverageMetricError> {
+    let min_timestamp = Utc::now() - get_max_metrics_age();
+
+    sqlx::query!("delete from metric_load_average where timestamp < $1 returning 1 as result", min_timestamp)
+        .fetch_one(&mut database).await?;
 
     Ok(())
 }

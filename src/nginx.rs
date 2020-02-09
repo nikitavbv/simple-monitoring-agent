@@ -6,6 +6,7 @@ use chrono::{Utc, DateTime};
 use custom_error::custom_error;
 
 use crate::database::Database;
+use crate::config::get_max_metrics_age;
 
 #[derive(Debug, Clone)]
 pub struct NginxStat {
@@ -85,6 +86,15 @@ pub async fn save_nginx_metric(mut database: &Database, hostname: &str, metric: 
         "insert into metric_nginx (hostname, timestamp, handled_requests) values ($1, $2, $3) returning hostname",
         hostname.to_string(), metric.timestamp, metric.handled_requests as i32
     ).fetch_one(&mut database).await?;
+
+    Ok(())
+}
+
+pub async fn cleanup_nginx_metric(mut database: &Database) -> Result<(), NginxMetricError> {
+    let min_timestamp = Utc::now() - get_max_metrics_age();
+
+    sqlx::query!("delete from metric_nginx where timestamp < $1 returning 1 as result", min_timestamp)
+        .fetch_one(&mut database).await?;
 
     Ok(())
 }

@@ -20,19 +20,23 @@ use std::env;
 
 use async_std::task;
 use log::{info, warn};
+use futures::future::join_all;
 
-use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric};
+use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric, cleanup_cpu_metric};
 use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
-use crate::load_avg::{monitor_load_average, save_load_average_metric};
-use crate::memory::{monitor_memory, save_memory_metric};
-use crate::io::{monitor_io, io_metric_from_stats, save_io_metric};
-use crate::fs::{monitor_filesystem_usage, save_filesystem_usage_metric};
-use crate::network::{monitor_network, network_metric_from_stats, save_network_metric};
-use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric};
-use crate::nginx::{monitor_nginx, nginx_metric_from_stats, save_nginx_metric};
-use crate::postgres::{monitor_postgres, postgres_metric_from_stats, save_postgres_metric};
+use crate::load_avg::{monitor_load_average, save_load_average_metric, cleanup_load_average_metric};
+use crate::memory::{monitor_memory, save_memory_metric, cleanup_memory_metric};
+use crate::io::{monitor_io, io_metric_from_stats, save_io_metric, cleanup_io_metric};
+use crate::fs::{monitor_filesystem_usage, save_filesystem_usage_metric, cleanup_fs_metric};
+use crate::network::{monitor_network, network_metric_from_stats, save_network_metric, cleanup_network_metric};
+use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric, cleanup_docker_metric};
+use crate::nginx::{monitor_nginx, nginx_metric_from_stats, save_nginx_metric, cleanup_nginx_metric};
+use crate::postgres::{monitor_postgres, postgres_metric_from_stats, save_postgres_metric, cleanup_postgres_metric};
+use futures::{TryFutureExt, FutureExt};
+
+const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
 
 #[tokio::main]
 async fn main() {
@@ -53,7 +57,10 @@ async fn main() {
 
     info!("ready");
 
+    let mut iter_count: i64 = 0;
+
     loop {
+        iter_count += 1;
         task::sleep(Duration::from_secs(get_metric_report_interval() as u64)).await;
 
         if !check_if_database_connection_is_live(&database).await {
@@ -157,6 +164,45 @@ async fn main() {
                 previous_postgres_stat = Ok(v);
             },
             Err(err) => warn!("failed to get postgres stats: {}", err)
+        }
+
+        if iter_count % 100 == 0 {
+            // time to clean up
+            if let Err(err) = cleanup_docker_metric(&database).await {
+                warn!("docker metric cleanup failed: {}", err);
+            }
+
+            if let Err(err) = cleanup_cpu_metric(&database).await {
+                warn!("cpu metric cleanup failed: {}", err);
+            }
+
+            if let Err(err) = cleanup_fs_metric(&database).await {
+                warn!("fs metric cleanup failed: {}", err);
+            }
+
+            if let Err(err) = cleanup_io_metric(&database).await {
+                warn!("io metric cleanup failed: {}", err);
+            }
+
+            if let Err(err) = cleanup_load_average_metric(&database).await {
+                warn!("load average metric cleanup failed: {}", err);
+            }
+
+            if let Err(err) = cleanup_memory_metric(&database).await {
+                warn!("memory metric cleanup failed: {}", err);
+            }
+
+            if let Err(err) = cleanup_network_metric(&database).await {
+                warn!("database metric cleanup failed: {}", err);
+            }
+
+            if let Err(err) = cleanup_nginx_metric(&database).await {
+                warn!("nginx metric cleanup failed: {}", err);
+            }
+
+            if let Err(err) = cleanup_postgres_metric(&database).await {
+                warn!("postgres metric cleanup failed: {}", err);
+            }
         }
     }
 }

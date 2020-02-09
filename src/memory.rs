@@ -6,6 +6,7 @@ use async_std::fs::read_to_string;
 use custom_error::custom_error;
 use std::collections::HashMap;
 use crate::database::Database;
+use crate::config::get_max_metrics_age;
 
 pub struct MemoryMetric {
     timestamp: DateTime<Utc>,
@@ -71,6 +72,15 @@ pub async fn save_memory_metric(mut database: &Database, hostname: &str, metric:
         metric.available.unwrap_or(0), metric.buffers.unwrap_or(0), metric.cached.unwrap_or(0),
         metric.swap_total.unwrap_or(0), metric.swap_free.unwrap_or(0)
     ).fetch_one(&mut database).await?;
+
+    Ok(())
+}
+
+pub async fn cleanup_memory_metric(mut database: &Database) -> Result<(), MemoryMetricError> {
+    let min_timestamp = Utc::now() - get_max_metrics_age();
+
+    sqlx::query!("delete from metric_memory where timestamp < $1 returning 1 as result", min_timestamp)
+        .fetch_one(&mut database).await?;
 
     Ok(())
 }

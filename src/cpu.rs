@@ -10,6 +10,7 @@ use sqlx::error::Error as SQLXError;
 use log::warn;
 
 use crate::database::Database;
+use crate::config::get_max_metrics_age;
 
 #[derive(Debug, Clone)]
 pub struct CPUStat  {
@@ -156,6 +157,15 @@ async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: D
         entry.iowait as i32, entry.irq as i32, entry.softirq as i32, entry.guest as i32, entry.steal as i32,
         entry.guest_nice as i32
     ).fetch_one(&mut database).await?;
+
+    Ok(())
+}
+
+pub async fn cleanup_cpu_metric(mut database: &Database) -> Result<(), CPUMetricError> {
+    let min_timestamp = Utc::now() - get_max_metrics_age();
+
+    sqlx::query!("delete from metric_cpu where timestamp < $1 returning 1 as result", min_timestamp)
+        .fetch_one(&mut database).await?;
 
     Ok(())
 }
