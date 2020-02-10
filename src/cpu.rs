@@ -6,8 +6,6 @@ use async_std::fs::read_to_string;
 use custom_error::custom_error;
 use futures::future::try_join_all;
 use chrono::{Utc, DateTime, Duration};
-use sqlx::error::Error as SQLXError;
-use log::warn;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;

@@ -20,7 +20,6 @@ use std::env;
 
 use async_std::task;
 use log::{info, warn};
-use futures::future::join_all;
 
 use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric, cleanup_cpu_metric};
 use crate::database::{connect, Database};
@@ -34,7 +33,6 @@ use crate::network::{monitor_network, network_metric_from_stats, save_network_me
 use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric, cleanup_docker_metric};
 use crate::nginx::{monitor_nginx, nginx_metric_from_stats, save_nginx_metric, cleanup_nginx_metric};
 use crate::postgres::{monitor_postgres, postgres_metric_from_stats, save_postgres_metric, cleanup_postgres_metric};
-use futures::{TryFutureExt, FutureExt};
 
 const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
 
@@ -166,7 +164,7 @@ async fn main() {
             Err(err) => warn!("failed to get postgres stats: {}", err)
         }
 
-        if iter_count % 100 == 0 {
+        if iter_count % METRICS_CLEANUP_INTERVAL == 0 {
             // time to clean up
             if let Err(err) = cleanup_docker_metric(&database).await {
                 warn!("docker metric cleanup failed: {}", err);
