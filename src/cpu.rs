@@ -76,7 +76,7 @@ pub async fn monitor_cpu_usage() -> Result<CPUStat, CPUMetricError> {
 
     let stat = read_to_string("/proc/stat").await?.lines()
         .map(|line| line.split_whitespace())
-        .filter(is_cpu_line)
+        .filter(|spl| is_cpu_line(spl).unwrap_or(false))
         .map(|mut spl: SplitWhitespace| Ok(CPUStatEntry {
             cpu: spl.next()?[3..].parse()?,
             user: spl.next()?.parse()?,
@@ -96,10 +96,10 @@ pub async fn monitor_cpu_usage() -> Result<CPUStat, CPUMetricError> {
     Ok(CPUStat { stat, timestamp })
 }
 
-fn is_cpu_line(spl: &SplitWhitespace) -> bool {
+fn is_cpu_line(spl: &SplitWhitespace) -> Result<bool, CPUMetricError> {
     let mut spl_clone = spl.clone();
-    let first_word: &str = spl_clone.nth(0).expect("expected spl to contain at least one word");
-    first_word.starts_with("cpu") && first_word.len() > 3 && spl_clone.count() == 10
+    let first_word: &str = spl_clone.nth(0)?;
+    Ok(first_word.starts_with("cpu") && first_word.len() > 3 && spl_clone.count() == 10)
 }
 
 pub fn cpu_metric_from_stats(first: CPUStat, second: CPUStat) -> CPUMetric {
