@@ -14,6 +14,7 @@ mod memory;
 mod network;
 mod nginx;
 mod postgres;
+mod types;
 
 use std::time::Duration;
 use std::env;
