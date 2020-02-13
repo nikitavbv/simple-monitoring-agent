@@ -1,3 +1,3 @@
 trait Metric {
-    fn collect() -> dyn Metric;
+    fn collect() -> Self;
 }
