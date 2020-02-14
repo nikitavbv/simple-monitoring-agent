@@ -6,18 +6,20 @@ use async_std::fs::read_to_string;
 use custom_error::custom_error;
 use futures::future::try_join_all;
 use chrono::{Utc, DateTime, Duration};
+use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
+use crate::types::{Metric, MetricCollectionError};
 
 #[derive(Debug, Clone)]
-pub struct CPUStat  {
+pub struct InstantCPUMetric  {
     timestamp: DateTime<Utc>,
-    stat: Vec<CPUStatEntry>,
+    stat: Vec<InstantCPUMetricEntry>,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct CPUStatEntry {
+pub struct InstantCPUMetricEntry {
     cpu: u16,
     user: u64,
     nice: u64,
@@ -71,29 +73,33 @@ impl From<std::num::ParseIntError> for CPUMetricError {
     }
 }
 
-pub async fn monitor_cpu_usage() -> Result<CPUStat, CPUMetricError> {
-    let timestamp = Utc::now();
+#[async_trait]
+impl Metric for InstantCPUMetric {
 
-    let stat = read_to_string("/proc/stat").await?.lines()
-        .map(|line| line.split_whitespace())
-        .filter(|spl| is_cpu_line(spl).unwrap_or(false))
-        .map(|mut spl: SplitWhitespace| Ok(CPUStatEntry {
-            cpu: spl.next()?[3..].parse()?,
-            user: spl.next()?.parse()?,
-            nice: spl.next()?.parse()?,
-            system: spl.next()?.parse()?,
-            idle: spl.next()?.parse()?,
-            iowait: spl.next()?.parse()?,
-            irq: spl.next()?.parse()?,
-            softirq: spl.next()?.parse()?,
-            guest: spl.next()?.parse()?,
-            steal: spl.next()?.parse()?,
-            guest_nice: spl.next()?.parse()?
-        }))
-        .filter_map(|v: Result<CPUStatEntry, CPUMetricError>| v.ok())
-        .collect();
+    async fn collect() -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
+        let timestamp = Utc::now();
 
-    Ok(CPUStat { stat, timestamp })
+        let stat = read_to_string("/proc/stat").await?.lines()
+            .map(|line| line.split_whitespace())
+            .filter(|spl| is_cpu_line(spl).unwrap_or(false))
+            .map(|mut spl: SplitWhitespace| Ok(InstantCPUMetricEntry {
+                cpu: spl.next()?[3..].parse()?,
+                user: spl.next()?.parse()?,
+                nice: spl.next()?.parse()?,
+                system: spl.next()?.parse()?,
+                idle: spl.next()?.parse()?,
+                iowait: spl.next()?.parse()?,
+                irq: spl.next()?.parse()?,
+                softirq: spl.next()?.parse()?,
+                guest: spl.next()?.parse()?,
+                steal: spl.next()?.parse()?,
+                guest_nice: spl.next()?.parse()?
+            }))
+            .filter_map(|v: Result<InstantCPUMetricEntry, MetricCollectionError>| v.ok())
+            .collect();
+
+        Ok(Box::new(InstantCPUMetric { stat, timestamp }))
+    }
 }
 
 fn is_cpu_line(spl: &SplitWhitespace) -> Result<bool, CPUMetricError> {
@@ -102,7 +108,7 @@ fn is_cpu_line(spl: &SplitWhitespace) -> Result<bool, CPUMetricError> {
     Ok(first_word.starts_with("cpu") && first_word.len() > 3 && spl_clone.count() == 10)
 }
 
-pub fn cpu_metric_from_stats(first: CPUStat, second: CPUStat) -> CPUMetric {
+pub fn cpu_metric_from_stats(first: InstantCPUMetric, second: InstantCPUMetric) -> CPUMetric {
     let time_diff = second.timestamp - first.timestamp;
 
     let first_iter = first.stat.into_iter();
@@ -118,7 +124,7 @@ pub fn cpu_metric_from_stats(first: CPUStat, second: CPUStat) -> CPUMetric {
     CPUMetric { stat, timestamp: second.timestamp }
 }
 
-fn cpu_metric_entry_from_two_stats(time_diff: Duration, first: CPUStatEntry, second: CPUStatEntry) -> CPUMetricEntry {
+fn cpu_metric_entry_from_two_stats(time_diff: Duration, first: InstantCPUMetricEntry, second: InstantCPUMetricEntry) -> CPUMetricEntry {
     let diff = time_diff.num_milliseconds() as f64 / 1000.0;
 
     CPUMetricEntry {

@@ -22,7 +22,7 @@ use std::env;
 use async_std::task;
 use log::{info, warn};
 
-use crate::cpu::{monitor_cpu_usage, cpu_metric_from_stats, save_cpu_metric, cleanup_cpu_metric};
+use crate::cpu::{cpu_metric_from_stats, save_cpu_metric, cleanup_cpu_metric, InstantCPUMetric};
 use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
@@ -34,6 +34,7 @@ use crate::network::{monitor_network, network_metric_from_stats, save_network_me
 use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric, cleanup_docker_metric};
 use crate::nginx::{monitor_nginx, nginx_metric_from_stats, save_nginx_metric, cleanup_nginx_metric};
 use crate::postgres::{monitor_postgres, postgres_metric_from_stats, save_postgres_metric, cleanup_postgres_metric};
+use crate::types::Metric;
 
 const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
 
@@ -47,7 +48,7 @@ async fn main() {
 
     let hostname = get_hostname();
 
-    let mut previous_cpu_stat = monitor_cpu_usage().await;
+    let mut previous_cpu_stat = InstantCPUMetric::collect().await;
     let mut previous_io_stat = monitor_io().await;
     let mut previous_network_stat = monitor_network().await;
     let mut previous_docker_stat = monitor_docker().await;
@@ -72,10 +73,10 @@ async fn main() {
             }
         }
 
-        match monitor_cpu_usage().await {
+        match InstantCPUMetric::collect().await {
             Ok(v) => {
                 if previous_cpu_stat.is_ok() {
-                    let metric = cpu_metric_from_stats(previous_cpu_stat.unwrap(), v.clone());
+                    let metric = cpu_metric_from_stats(*previous_cpu_stat.unwrap(), *v.clone());
                     if let Err(err) = save_cpu_metric(&database, &hostname, metric).await {
                         warn!("failed to save cpu metric: {}", err);
                     }

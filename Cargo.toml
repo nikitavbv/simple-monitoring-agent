@@ -22,3 +22,4 @@ hyperlocal = { git = "https://github.com/softprops/hyperlocal" }
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_json = "1.0.45"
 reqwest = { version = "0.10.1", features = [ "json", "rustls-tls" ] }
+async-trait = "0.1.24"
