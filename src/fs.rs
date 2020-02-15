@@ -5,10 +5,12 @@ use std::process::Command;
 use chrono::{Utc, DateTime};
 use custom_error::custom_error;
 use futures::future::join_all;
+use async_trait::async_trait;
 
 use crate::database::Database;
 use std::collections::HashMap;
 use crate::config::get_max_metrics_age;
+use crate::types::{Metric, MetricCollectionError};
 
 #[derive(Debug, Clone)]
 pub struct FilesystemUsageMetric {
@@ -21,6 +23,35 @@ pub struct FilesystemUsageMetricEntry {
     filesystem: String,
     total: i64,
     used: i64
+}
+
+#[async_trait]
+impl Metric for FilesystemUsageMetric {
+
+    async fn collect() -> Result<Box<Self>, MetricCollectionError> {
+        let timestamp = Utc::now();
+
+        let stat = String::from_utf8_lossy(
+            &Command::new("df").output()?.stdout
+        )
+            .lines()
+            .skip(1)
+            .map(|line| line.split_whitespace())
+            .map(|mut line| Ok(FilesystemUsageMetricEntry {
+                filesystem: line.next()?.to_string(),
+                total: line.next()?.parse()?,
+                used: line.next()?.parse()?
+            }))
+            .filter_map(|v: Result<FilesystemUsageMetricEntry, FilesystemUsageMetricError>| v.ok())
+            .filter(|v| v.filesystem != "tmpfs" && v.filesystem != "overlay" && v.filesystem != "shm")
+            .map(|v| (v.filesystem.clone(), v))
+            .collect::<HashMap<String, FilesystemUsageMetricEntry>>() // deduplicate
+            .into_iter()
+            .map(|v| v.1)
+            .collect();
+
+        Ok(Box::new(FilesystemUsageMetric { timestamp, stat }))
+    }
 }
 
 custom_error!{pub FilesystemUsageMetricError
@@ -39,31 +70,6 @@ impl From<std::num::ParseIntError> for FilesystemUsageMetricError {
     fn from(err: ParseIntError) -> Self {
         FilesystemUsageMetricError::FailedToParse{description: err.to_string()}
     }
-}
-
-pub async fn monitor_filesystem_usage() -> Result<FilesystemUsageMetric, FilesystemUsageMetricError> {
-    let timestamp = Utc::now();
-
-    let stat = String::from_utf8_lossy(
-        &Command::new("df").output()?.stdout
-    )
-        .lines()
-        .skip(1)
-        .map(|line| line.split_whitespace())
-        .map(|mut line| Ok(FilesystemUsageMetricEntry {
-            filesystem: line.next()?.to_string(),
-            total: line.next()?.parse()?,
-            used: line.next()?.parse()?
-        }))
-        .filter_map(|v: Result<FilesystemUsageMetricEntry, FilesystemUsageMetricError>| v.ok())
-        .filter(|v| v.filesystem != "tmpfs" && v.filesystem != "overlay" && v.filesystem != "shm")
-        .map(|v| (v.filesystem.clone(), v))
-        .collect::<HashMap<String, FilesystemUsageMetricEntry>>() // deduplicate
-        .into_iter()
-        .map(|v| v.1)
-        .collect();
-
-    Ok(FilesystemUsageMetric { timestamp, stat })
 }
 
 pub async fn save_filesystem_usage_metric(database: &Database, hostname: &str, metric: &FilesystemUsageMetric) {

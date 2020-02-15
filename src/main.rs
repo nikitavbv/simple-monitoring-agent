@@ -29,7 +29,7 @@ use crate::hostname::get_hostname;
 use crate::load_avg::{monitor_load_average, save_load_average_metric, cleanup_load_average_metric};
 use crate::memory::{monitor_memory, save_memory_metric, cleanup_memory_metric};
 use crate::io::{monitor_io, io_metric_from_stats, save_io_metric, cleanup_io_metric};
-use crate::fs::{monitor_filesystem_usage, save_filesystem_usage_metric, cleanup_fs_metric};
+use crate::fs::{FilesystemUsageMetric, save_filesystem_usage_metric, cleanup_fs_metric};
 use crate::network::{monitor_network, network_metric_from_stats, save_network_metric, cleanup_network_metric};
 use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric, cleanup_docker_metric};
 use crate::nginx::{monitor_nginx, nginx_metric_from_stats, save_nginx_metric, cleanup_nginx_metric};
@@ -113,7 +113,7 @@ async fn main() {
             Err(err) => warn!("failed to get io stats: {}", err)
         };
 
-        match monitor_filesystem_usage().await {
+        match FilesystemUsageMetric::collect().await {
             Ok(v) => save_filesystem_usage_metric(&database, &hostname, &v).await,
             Err(err) => warn!("failed to record filesystem usage metric: {}", err)
         };
