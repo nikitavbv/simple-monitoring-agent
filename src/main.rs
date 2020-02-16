@@ -28,7 +28,7 @@ use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::{monitor_load_average, save_load_average_metric, cleanup_load_average_metric};
 use crate::memory::{monitor_memory, save_memory_metric, cleanup_memory_metric};
-use crate::io::{monitor_io, io_metric_from_stats, save_io_metric, cleanup_io_metric};
+use crate::io::{io_metric_from_stats, save_io_metric, cleanup_io_metric, InstantIOMetric};
 use crate::fs::{FilesystemUsageMetric, save_filesystem_usage_metric, cleanup_fs_metric};
 use crate::network::{monitor_network, network_metric_from_stats, save_network_metric, cleanup_network_metric};
 use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric, cleanup_docker_metric};
@@ -49,7 +49,7 @@ async fn main() {
     let hostname = get_hostname();
 
     let mut previous_cpu_stat = InstantCPUMetric::collect().await;
-    let mut previous_io_stat = monitor_io().await;
+    let mut previous_io_stat = InstantIOMetric::collect().await;
     let mut previous_network_stat = monitor_network().await;
     let mut previous_docker_stat = monitor_docker().await;
     let mut previous_nginx_stat = monitor_nginx().await;
@@ -102,10 +102,10 @@ async fn main() {
             Err(err) => warn!("failed to collect memory metric: {}", err)
         };
 
-        match monitor_io().await {
+        match InstantIOMetric::collect().await {
             Ok(v) => {
                 if previous_io_stat.is_ok() {
-                    let metric = io_metric_from_stats(previous_io_stat.unwrap(), v.clone());
+                    let metric = io_metric_from_stats(*previous_io_stat.unwrap(), *v.clone());
                     save_io_metric(&database, &hostname, &metric).await;
                 }
                 previous_io_stat = Ok(v);

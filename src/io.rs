@@ -6,18 +6,20 @@ use async_std::fs::read_to_string;
 use custom_error::custom_error;
 use futures::future::join_all;
 use chrono::{Utc, DateTime, Duration};
+use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
+use crate::types::{Metric, MetricCollectionError};
 
 #[derive(Debug, Clone)]
-pub struct IOStat {
+pub struct InstantIOMetric {
     timestamp: DateTime<Utc>,
-    stat: Vec<IOStatEntry>,
+    stat: Vec<InstantIOMetricEntry>,
 }
 
 #[derive(Debug, Clone)]
-pub struct IOStatEntry {
+pub struct InstantIOMetricEntry {
     device_name: String,
     sectors_read: u64,
     sectors_written: u64
@@ -34,6 +36,37 @@ pub struct IOMetricEntry {
     device: String,
     read: f64,
     write: f64
+}
+
+#[async_trait]
+impl Metric for InstantIOMetric {
+
+    async fn collect() -> Result<Box<Self>, MetricCollectionError> {
+        let timestamp = Utc::now();
+
+        let stat = read_to_string("/proc/diskstats").await?.lines()
+            .map(|line| line.split_whitespace())
+            .map(|s: SplitWhitespace| {
+                let spl = s.clone();
+                let mut spl = spl.skip(2);
+
+                let device_name = spl.next()?.to_string();
+                let mut spl = spl.skip(2);
+
+                let sectors_read = spl.next()?.parse()?;
+                let sectors_written = spl.next()?.parse()?;
+
+                Ok(InstantIOMetricEntry {
+                    device_name,
+                    sectors_read,
+                    sectors_written
+                })
+            })
+            .filter_map(|v: Result<InstantIOMetricEntry, IOMetricError>| v.ok())
+            .collect();
+
+        Ok(Box::new(InstantIOMetric { stat, timestamp }))
+    }
 }
 
 custom_error!{pub IOMetricError
@@ -59,34 +92,7 @@ impl From<std::num::ParseIntError> for IOMetricError {
 // /tree/include/linux/types.h?id=v4.4-rc6#n121
 const DEVICE_BLOCK_SIZE: i32 = 512;
 
-pub async fn monitor_io() -> Result<IOStat, IOMetricError> {
-    let timestamp = Utc::now();
-
-    let stat = read_to_string("/proc/diskstats").await?.lines()
-        .map(|line| line.split_whitespace())
-        .map(|s: SplitWhitespace| {
-            let spl = s.clone();
-            let mut spl = spl.skip(2);
-
-            let device_name = spl.next()?.to_string();
-            let mut spl = spl.skip(2);
-
-            let sectors_read = spl.next()?.parse()?;
-            let sectors_written = spl.next()?.parse()?;
-
-            Ok(IOStatEntry {
-                device_name,
-                sectors_read,
-                sectors_written
-            })
-        })
-        .filter_map(|v: Result<IOStatEntry, IOMetricError>| v.ok())
-        .collect();
-
-    Ok(IOStat { stat, timestamp })
-}
-
-pub fn io_metric_from_stats(first: IOStat, second: IOStat) -> IOMetric {
+pub fn io_metric_from_stats(first: InstantIOMetric, second: InstantIOMetric) -> IOMetric {
     let time_diff = second.timestamp - first.timestamp;
 
     let first_iter = first.stat.into_iter();
@@ -102,7 +108,7 @@ pub fn io_metric_from_stats(first: IOStat, second: IOStat) -> IOMetric {
     IOMetric { stat, timestamp: second.timestamp }
 }
 
-fn io_metric_entry_from_two_stats(time_diff: Duration, first: IOStatEntry, second: IOStatEntry) -> IOMetricEntry {
+fn io_metric_entry_from_two_stats(time_diff: Duration, first: InstantIOMetricEntry, second: InstantIOMetricEntry) -> IOMetricEntry {
     let diff = time_diff.num_milliseconds() as f64 / 1000.0; // seconds
 
     let read = ((second.sectors_read - first.sectors_read) * DEVICE_BLOCK_SIZE as u64) as f64 / diff;
