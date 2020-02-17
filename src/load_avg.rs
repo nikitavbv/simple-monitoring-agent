@@ -4,15 +4,35 @@ use std::num::ParseFloatError;
 use async_std::fs::read_to_string;
 use chrono::{Utc, DateTime};
 use custom_error::custom_error;
+use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
+use crate::types::{Metric, MetricCollectionError};
 
 pub struct LoadAverageMetric {
     timestamp: DateTime<Utc>,
     one: f64,
     five: f64,
     fifteen: f64
+}
+
+#[async_trait]
+impl Metric for LoadAverageMetric {
+
+    async fn collect() -> Result<Box<Self>, MetricCollectionError> {
+        let timestamp = Utc::now();
+
+        let metric = read_to_string("/proc/loadavg").await?;
+        let mut spl = metric.split_whitespace();
+
+        Ok(Box::new(LoadAverageMetric {
+            timestamp,
+            one: spl.next()?.parse()?,
+            five: spl.next()?.parse()?,
+            fifteen: spl.next()?.parse()?,
+        }))
+    }
 }
 
 custom_error! {pub LoadAverageMetricError
@@ -31,20 +51,6 @@ impl From<std::num::ParseFloatError> for LoadAverageMetricError {
     fn from(err: ParseFloatError) -> Self {
         LoadAverageMetricError::FailedToParse{description: err.to_string()}
     }
-}
-
-pub async fn monitor_load_average() -> Result<LoadAverageMetric, LoadAverageMetricError> {
-    let timestamp = Utc::now();
-
-    let metric = read_to_string("/proc/loadavg").await?;
-    let mut spl = metric.split_whitespace();
-
-    Ok(LoadAverageMetric {
-        timestamp,
-        one: spl.next()?.parse()?,
-        five: spl.next()?.parse()?,
-        fifteen: spl.next()?.parse()?,
-    })
 }
 
 pub async fn save_load_average_metric(mut database: &Database, hostname: String, metric: LoadAverageMetric) -> Result<(), LoadAverageMetricError> {

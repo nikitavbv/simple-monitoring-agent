@@ -1,5 +1,5 @@
 use std::option::NoneError;
-use std::num::ParseIntError;
+use std::num::{ParseIntError, ParseFloatError};
 use custom_error::custom_error;
 use async_trait::async_trait;
 
@@ -17,6 +17,12 @@ impl From<std::option::NoneError> for MetricCollectionError {
 
 impl From<std::num::ParseIntError> for MetricCollectionError {
     fn from(err: ParseIntError) -> Self {
+        MetricCollectionError::FailedToParse{description: err.to_string()}
+    }
+}
+
+impl From<std::num::ParseFloatError> for MetricCollectionError {
+    fn from(err: ParseFloatError) -> Self {
         MetricCollectionError::FailedToParse{description: err.to_string()}
     }
 }
