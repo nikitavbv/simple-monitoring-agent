@@ -27,7 +27,7 @@ use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::{save_load_average_metric, cleanup_load_average_metric, LoadAverageMetric};
-use crate::memory::{monitor_memory, save_memory_metric, cleanup_memory_metric};
+use crate::memory::{save_memory_metric, cleanup_memory_metric, MemoryMetric};
 use crate::io::{io_metric_from_stats, save_io_metric, cleanup_io_metric, InstantIOMetric};
 use crate::fs::{FilesystemUsageMetric, save_filesystem_usage_metric, cleanup_fs_metric};
 use crate::network::{monitor_network, network_metric_from_stats, save_network_metric, cleanup_network_metric};
@@ -94,7 +94,7 @@ async fn main() {
             Err(err) => warn!("failed to collect load average metric: {}", err)
         };
 
-        match monitor_memory().await {
+        match MemoryMetric::collect().await {
             Ok(v) => match save_memory_metric(&database, &hostname, &v).await {
                 Ok(_) => {},
                 Err(err) => warn!("failed to record memory metric: {}", err)
