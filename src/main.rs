@@ -30,7 +30,7 @@ use crate::load_avg::{save_load_average_metric, cleanup_load_average_metric, Loa
 use crate::memory::{save_memory_metric, cleanup_memory_metric, MemoryMetric};
 use crate::io::{io_metric_from_stats, save_io_metric, cleanup_io_metric, InstantIOMetric};
 use crate::fs::{FilesystemUsageMetric, save_filesystem_usage_metric, cleanup_fs_metric};
-use crate::network::{monitor_network, network_metric_from_stats, save_network_metric, cleanup_network_metric};
+use crate::network::{network_metric_from_stats, save_network_metric, cleanup_network_metric, InstantNetworkMetric};
 use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric, cleanup_docker_metric};
 use crate::nginx::{monitor_nginx, nginx_metric_from_stats, save_nginx_metric, cleanup_nginx_metric};
 use crate::postgres::{monitor_postgres, postgres_metric_from_stats, save_postgres_metric, cleanup_postgres_metric};
@@ -50,7 +50,7 @@ async fn main() {
 
     let mut previous_cpu_stat = InstantCPUMetric::collect().await;
     let mut previous_io_stat = InstantIOMetric::collect().await;
-    let mut previous_network_stat = monitor_network().await;
+    let mut previous_network_stat = InstantNetworkMetric::collect().await;
     let mut previous_docker_stat = monitor_docker().await;
     let mut previous_nginx_stat = monitor_nginx().await;
     let mut previous_postgres_stat = monitor_postgres(&database).await;
@@ -118,7 +118,7 @@ async fn main() {
             Err(err) => warn!("failed to record filesystem usage metric: {}", err)
         };
 
-        match monitor_network().await {
+        match InstantNetworkMetric::collect().await {
             Ok(v) => {
                 if previous_network_stat.is_ok() {
                     let metric = network_metric_from_stats(&previous_network_stat.unwrap(), &v);
