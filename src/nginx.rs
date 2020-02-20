@@ -4,12 +4,14 @@ use std::env;
 
 use chrono::{Utc, DateTime};
 use custom_error::custom_error;
+use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
+use crate::types::{Metric, MetricCollectionError};
 
 #[derive(Debug, Clone)]
-pub struct NginxStat {
+pub struct NginxInstantMetric {
     timestamp: DateTime<Utc>,
     handled_requests: u64
 }
@@ -18,6 +20,27 @@ pub struct NginxStat {
 pub struct NginxMetric {
     timestamp: DateTime<Utc>,
     handled_requests: u32
+}
+
+#[async_trait]
+impl Metric for NginxInstantMetric {
+
+    async fn collect() -> Result<Box<Self>, MetricCollectionError> {
+        let url = match get_nginx_status_endpoint_url() {
+            Some(v) => v,
+            None => return Err(MetricCollectionError::NotConfigured { description: "nginx not configured".to_string() })
+        };
+
+        let timestamp = Utc::now();
+
+        let res = reqwest::get(&url).await?.text().await?;
+        let mut stat = res.lines().skip(2).next()?.split_whitespace();
+
+        Ok(Box::new(NginxInstantMetric {
+            timestamp,
+            handled_requests: stat.nth(2)?.parse()?
+        }))
+    }
 }
 
 custom_error!{pub NginxMetricError
@@ -55,24 +78,7 @@ fn get_nginx_status_endpoint_url() -> Option<String> {
     env::var("NGINX_STATUS_ENDPOINT").ok()
 }
 
-pub async fn monitor_nginx() -> Result<NginxStat, NginxMetricError> {
-    let url = match get_nginx_status_endpoint_url() {
-        Some(v) => v,
-        None => return Err(NginxMetricError::NotConfigured)
-    };
-
-    let timestamp = Utc::now();
-
-    let res = reqwest::get(&url).await?.text().await?;
-    let mut stat = res.lines().skip(2).next()?.split_whitespace();
-
-    Ok(NginxStat {
-        timestamp,
-        handled_requests: stat.nth(2)?.parse()?
-    })
-}
-
-pub fn nginx_metric_from_stats(first: &NginxStat, second: &NginxStat) -> NginxMetric {
+pub fn nginx_metric_from_stats(first: &NginxInstantMetric, second: &NginxInstantMetric) -> NginxMetric {
     let time_diff = ((second.timestamp - first.timestamp).num_milliseconds() / (1000 * 60)) as u64; // minutes
 
     NginxMetric {
