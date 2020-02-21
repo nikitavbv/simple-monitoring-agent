@@ -20,7 +20,7 @@ pub struct LoadAverageMetric {
 #[async_trait]
 impl Metric for LoadAverageMetric {
 
-    async fn collect() -> Result<Box<Self>, MetricCollectionError> {
+    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let metric = read_to_string("/proc/loadavg").await?;

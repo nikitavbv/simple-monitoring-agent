@@ -41,7 +41,7 @@ pub struct IOMetricEntry {
 #[async_trait]
 impl Metric for InstantIOMetric {
 
-    async fn collect() -> Result<Box<Self>, MetricCollectionError> {
+    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string("/proc/diskstats").await?.lines()

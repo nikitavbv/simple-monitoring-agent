@@ -4,12 +4,14 @@ use chrono::{DateTime, Utc};
 use futures::future::{try_join_all, try_join};
 use futures::{TryFutureExt, TryStreamExt};
 use custom_error::custom_error;
+use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
+use crate::types::{Metric, MetricCollectionError};
 
 #[derive(Debug, Clone)]
-pub struct PostgresStat {
+pub struct InstantPostgresMetric {
     timestamp: DateTime<Utc>,
     database_stat: DatabaseStat,
     table_stat: Vec<TableStat>
@@ -54,35 +56,31 @@ pub struct TableMetric {
     total_bytes: i64
 }
 
-custom_error!{pub PostgresMetricError
-    NotConfigured = "database to monitor not set",
-    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
-}
+#[async_trait]
+impl Metric for InstantPostgresMetric {
 
-fn get_postgres_database_name() -> Option<String> {
-    env::var("DATABASE_TO_MONITOR").ok()
-}
+    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError> {
+        let database_to_monitor = match get_postgres_database_name() {
+            Some(v) => v,
+            None => return Err(MetricCollectionError::NotConfigured {
+                description: "postgres database name not set yet".to_string()
+            })
+        };
 
-pub async fn monitor_postgres(mut database: &Database) -> Result<PostgresStat, PostgresMetricError> {
-    let database_to_monitor = match get_postgres_database_name() {
-        Some(v) => v,
-        None => return Err(PostgresMetricError::NotConfigured)
-    };
+        let timestamp = Utc::now();
 
-    let timestamp = Utc::now();
-
-    let database_stat = sqlx::query!(
+        let database_stat = sqlx::query!(
         "select cast(tup_returned as int), cast(tup_fetched as int), cast(tup_inserted as int), cast(tup_updated as int), cast(tup_deleted as int) from pg_stat_database where datname = cast($1 as text) limit 1",
         database_to_monitor
     ).fetch_one(&mut database).map_ok(|rec| DatabaseStat {
-        tup_returned: rec.tup_returned,
-        tup_fetched: rec.tup_fetched,
-        tup_inserted: rec.tup_inserted,
-        tup_updated: rec.tup_updated,
-        tup_deleted: rec.tup_deleted
-    }).await?;
+            tup_returned: rec.tup_returned,
+            tup_fetched: rec.tup_fetched,
+            tup_inserted: rec.tup_inserted,
+            tup_updated: rec.tup_updated,
+            tup_deleted: rec.tup_deleted
+        }).await?;
 
-    let table_stat = sqlx::query!(r"
+        let table_stat = sqlx::query!(r"
 SELECT cast(table_name as text), row_estimate, total_bytes AS total
   FROM (
   SELECT *, total_bytes-index_bytes-COALESCE(toast_bytes,0) AS table_bytes FROM (
@@ -96,19 +94,29 @@ SELECT cast(table_name as text), row_estimate, total_bytes AS total
           WHERE relkind = 'r' and relname not like 'pg_%' and relname not like 'sql_%'
   ) a
 ) a;").fetch(&mut database).map_ok(|rec| TableStat {
-        table: rec.table_name,
-        rows: rec.row_estimate,
-        total_bytes: rec.total,
-    }).try_collect().await?;
+            table: rec.table_name,
+            rows: rec.row_estimate,
+            total_bytes: rec.total,
+        }).try_collect().await?;
 
-    Ok(PostgresStat {
-        timestamp,
-        database_stat,
-        table_stat
-    })
+        Ok(Box::new(InstantPostgresMetric {
+            timestamp,
+            database_stat,
+            table_stat
+        }))
+    }
 }
 
-pub fn postgres_metric_from_stats(first: &PostgresStat, second: &PostgresStat) -> PostgresMetric {
+custom_error!{pub PostgresMetricError
+    NotConfigured = "database to monitor not set",
+    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
+}
+
+fn get_postgres_database_name() -> Option<String> {
+    env::var("DATABASE_TO_MONITOR").ok()
+}
+
+pub fn postgres_metric_from_stats(first: &InstantPostgresMetric, second: &InstantPostgresMetric) -> PostgresMetric {
     PostgresMetric {
         timestamp: second.timestamp,
         table_metrics: second.table_stat.iter().map(|v| TableMetric {

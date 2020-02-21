@@ -2,6 +2,7 @@ use std::option::NoneError;
 use std::num::{ParseIntError, ParseFloatError};
 use custom_error::custom_error;
 use async_trait::async_trait;
+use crate::database::Database;
 
 custom_error! {pub MetricCollectionError
     FailedToRead{source: std::io::Error} = "failed to read metric: {source}",
@@ -39,5 +40,5 @@ impl From<http::uri::InvalidUri> for MetricCollectionError {
 
 #[async_trait]
 pub trait Metric {
-    async fn collect() -> Result<Box<Self>, MetricCollectionError>;
+    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError>;
 }

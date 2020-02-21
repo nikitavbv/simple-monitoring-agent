@@ -25,7 +25,7 @@ pub struct MemoryMetric {
 #[async_trait]
 impl Metric for MemoryMetric {
 
-    async fn collect() -> Result<Box<Self>, MetricCollectionError> {
+    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let data: String = read_to_string("/proc/meminfo").await?;

@@ -25,7 +25,7 @@ pub struct NginxMetric {
 #[async_trait]
 impl Metric for NginxInstantMetric {
 
-    async fn collect() -> Result<Box<Self>, MetricCollectionError> {
+    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError> {
         let url = match get_nginx_status_endpoint_url() {
             Some(v) => v,
             None => return Err(MetricCollectionError::NotConfigured { description: "nginx not configured".to_string() })

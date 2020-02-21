@@ -76,7 +76,7 @@ impl From<std::num::ParseIntError> for CPUMetricError {
 #[async_trait]
 impl Metric for InstantCPUMetric {
 
-    async fn collect() -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
+    async fn collect(mut database: &Database) -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string("/proc/stat").await?.lines()

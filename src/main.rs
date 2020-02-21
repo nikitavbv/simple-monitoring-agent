@@ -33,7 +33,7 @@ use crate::fs::{FilesystemUsageMetric, save_filesystem_usage_metric, cleanup_fs_
 use crate::network::{network_metric_from_stats, save_network_metric, cleanup_network_metric, InstantNetworkMetric};
 use crate::docker::metric::{monitor_docker, docker_metric_from_stats, save_docker_metric, cleanup_docker_metric};
 use crate::nginx::{nginx_metric_from_stats, save_nginx_metric, cleanup_nginx_metric, NginxInstantMetric};
-use crate::postgres::{monitor_postgres, postgres_metric_from_stats, save_postgres_metric, cleanup_postgres_metric};
+use crate::postgres::{postgres_metric_from_stats, save_postgres_metric, cleanup_postgres_metric, InstantPostgresMetric};
 use crate::types::Metric;
 
 const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
@@ -48,12 +48,12 @@ async fn main() {
 
     let hostname = get_hostname();
 
-    let mut previous_cpu_stat = InstantCPUMetric::collect().await;
-    let mut previous_io_stat = InstantIOMetric::collect().await;
-    let mut previous_network_stat = InstantNetworkMetric::collect().await;
+    let mut previous_cpu_stat = InstantCPUMetric::collect(&mut database).await;
+    let mut previous_io_stat = InstantIOMetric::collect(&mut database).await;
+    let mut previous_network_stat = InstantNetworkMetric::collect(&mut database).await;
     let mut previous_docker_stat = monitor_docker().await;
-    let mut previous_nginx_stat = NginxInstantMetric::collect().await;
-    let mut previous_postgres_stat = monitor_postgres(&database).await;
+    let mut previous_nginx_stat = NginxInstantMetric::collect(&mut database).await;
+    let mut previous_postgres_stat = InstantPostgresMetric::collect(&mut database).await;
 
     info!("ready");
 
@@ -73,7 +73,7 @@ async fn main() {
             }
         }
 
-        match InstantCPUMetric::collect().await {
+        match InstantCPUMetric::collect(&database).await {
             Ok(v) => {
                 if previous_cpu_stat.is_ok() {
                     let metric = cpu_metric_from_stats(*previous_cpu_stat.unwrap(), *v.clone());
@@ -86,7 +86,7 @@ async fn main() {
             Err(err) => warn!("failed to get cpu stats: {}", err)
         };
 
-        match LoadAverageMetric::collect().await {
+        match LoadAverageMetric::collect(&database).await {
             Ok(v) => match save_load_average_metric(&database, hostname.clone(), *v).await {
                 Ok(_) => {},
                 Err(err) => warn!("failed to record load average metric: {}", err)
@@ -94,7 +94,7 @@ async fn main() {
             Err(err) => warn!("failed to collect load average metric: {}", err)
         };
 
-        match MemoryMetric::collect().await {
+        match MemoryMetric::collect(&database).await {
             Ok(v) => match save_memory_metric(&database, &hostname, &v).await {
                 Ok(_) => {},
                 Err(err) => warn!("failed to record memory metric: {}", err)
@@ -102,7 +102,7 @@ async fn main() {
             Err(err) => warn!("failed to collect memory metric: {}", err)
         };
 
-        match InstantIOMetric::collect().await {
+        match InstantIOMetric::collect(&database).await {
             Ok(v) => {
                 if previous_io_stat.is_ok() {
                     let metric = io_metric_from_stats(*previous_io_stat.unwrap(), *v.clone());
@@ -113,12 +113,12 @@ async fn main() {
             Err(err) => warn!("failed to get io stats: {}", err)
         };
 
-        match FilesystemUsageMetric::collect().await {
+        match FilesystemUsageMetric::collect(&database).await {
             Ok(v) => save_filesystem_usage_metric(&database, &hostname, &v).await,
             Err(err) => warn!("failed to record filesystem usage metric: {}", err)
         };
 
-        match InstantNetworkMetric::collect().await {
+        match InstantNetworkMetric::collect(&database).await {
             Ok(v) => {
                 if previous_network_stat.is_ok() {
                     let metric = network_metric_from_stats(&previous_network_stat.unwrap(), &v);
@@ -140,7 +140,7 @@ async fn main() {
             Err(err) => warn!("failed to get docker stats: {}", err)
         };
 
-        match NginxInstantMetric::collect().await {
+        match NginxInstantMetric::collect(&database).await {
             Ok(v) => {
                 if previous_nginx_stat.is_ok() {
                     let metric = nginx_metric_from_stats(&previous_nginx_stat.unwrap(), &v);
@@ -153,7 +153,7 @@ async fn main() {
             Err(err) => warn!("failed to get nginx stats: {}", err)
         }
 
-        match monitor_postgres(&mut database).await {
+        match InstantPostgresMetric::collect(&database).await {
             Ok(v) => {
                 if previous_postgres_stat.is_ok() {
                     let metric = postgres_metric_from_stats(&previous_postgres_stat.unwrap(), &v);
