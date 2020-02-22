@@ -3,13 +3,15 @@ use std::num::{ParseIntError, ParseFloatError};
 use custom_error::custom_error;
 use async_trait::async_trait;
 use crate::database::Database;
+use crate::docker::client::DockerClientError;
 
 custom_error! {pub MetricCollectionError
     FailedToRead{source: std::io::Error} = "failed to read metric: {source}",
     FailedToParse{description: String} = "failed to parse metric: {description}",
     RequestFailed{source: reqwest::Error} = "failed to request nginx status: {source}",
     DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed: {source}",
-    NotConfigured{description: String} = "not configured: {description}"
+    NotConfigured{description: String} = "not configured: {description}",
+    DockerClientError{source: DockerClientError} = "docker client error: {source}"
 }
 
 impl From<std::option::NoneError> for MetricCollectionError {

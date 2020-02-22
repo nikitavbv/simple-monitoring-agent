@@ -3,19 +3,23 @@ use custom_error::custom_error;
 use futures::future::join_all;
 use log::warn;
 
+use sqlx::{PgConnection, Pool};
+use async_trait::async_trait;
+
 use crate::database::Database;
 use crate::docker::client::{containers, DockerClientError, stats, Container, ContainerStats};
 use futures::FutureExt;
 use crate::config::get_max_metrics_age;
+use crate::types::{Metric, MetricCollectionError};
 
 #[derive(Debug, Clone)]
-pub struct DockerContainerStats {
+pub struct InstantDockerContainerMetric {
     timestamp: DateTime<Utc>,
-    stat: Vec<DockerContainerStatEntry>
+    stat: Vec<InstantDockerContainerMetricEntry>
 }
 
 #[derive(Debug, Clone)]
-pub struct DockerContainerStatEntry {
+pub struct InstantDockerContainerMetricEntry {
     name: String,
     state: String,
 
@@ -54,35 +58,39 @@ custom_error!{pub DockerMetricError
     DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
 }
 
-pub async fn monitor_docker() -> Result<DockerContainerStats, DockerMetricError> {
-    let timestamp = Utc::now();
+#[async_trait]
+impl Metric for InstantDockerContainerMetric {
 
-    let stat: Vec<DockerContainerStatEntry> = join_all(containers().await?.into_iter()
-        .map(|v| stats(v.id.clone()).map(|s| (v, s)))
-    ).await.into_iter().filter_map(|v| match v.1 {
-        Ok(stats) => Some((v.0, stats)),
-        Err(err) => {
-            warn!("failed to get container stats ({}): {}", v.0.id, err);
-            None
-        }
-    }).map(|v: (Container, ContainerStats)| DockerContainerStatEntry {
-        name: v.1.name[1..].to_string(),
-        state: v.0.state,
+    async fn collect(mut database: &Pool<PgConnection>) -> Result<Box<Self>, MetricCollectionError> {
+        let timestamp = Utc::now();
 
-        cpu_usage: (v.1.cpu_stats.cpu_usage.total_usage / 1000) as u64,
-        system_cpu_usage: (v.1.cpu_stats.system_cpu_usage / 1_000_000) as u64,
+        let stat: Vec<InstantDockerContainerMetricEntry> = join_all(containers().await?.into_iter()
+            .map(|v| stats(v.id.clone()).map(|s| (v, s)))
+        ).await.into_iter().filter_map(|v| match v.1 {
+            Ok(stats) => Some((v.0, stats)),
+            Err(err) => {
+                warn!("failed to get container stats ({}): {}", v.0.id, err);
+                None
+            }
+        }).map(|v: (Container, ContainerStats)| InstantDockerContainerMetricEntry {
+            name: v.1.name[1..].to_string(),
+            state: v.0.state,
 
-        memory_usage: v.1.memory_stats.usage,
-        memory_cache: v.1.memory_stats.stats.cache,
+            cpu_usage: (v.1.cpu_stats.cpu_usage.total_usage / 1000) as u64,
+            system_cpu_usage: (v.1.cpu_stats.system_cpu_usage / 1_000_000) as u64,
 
-        network_tx: v.1.networks.iter().map(|v| v.1.tx_bytes).fold(0, |a, b| a + b),
-        network_rx: v.1.networks.iter().map(|v| v.1.rx_bytes).fold(0, |a, b| a + b)
-    }).collect();
+            memory_usage: v.1.memory_stats.usage,
+            memory_cache: v.1.memory_stats.stats.cache,
 
-    Ok(DockerContainerStats { timestamp, stat })
+            network_tx: v.1.networks.iter().map(|v| v.1.tx_bytes).fold(0, |a, b| a + b),
+            network_rx: v.1.networks.iter().map(|v| v.1.rx_bytes).fold(0, |a, b| a + b)
+        }).collect();
+
+        Ok(Box::new(InstantDockerContainerMetric { timestamp, stat }))
+    }
 }
 
-pub fn docker_metric_from_stats(first: &DockerContainerStats, second: &DockerContainerStats) -> DockerContainerMetric {
+pub fn docker_metric_from_stats(first: &InstantDockerContainerMetric, second: &InstantDockerContainerMetric) -> DockerContainerMetric {
     let first = first.clone();
     let second = second.clone();
     let time_diff = second.timestamp - first.timestamp;
@@ -101,7 +109,7 @@ pub fn docker_metric_from_stats(first: &DockerContainerStats, second: &DockerCon
     DockerContainerMetric { stat, timestamp: second.timestamp }
 }
 
-fn docker_metric_entry_from_two_stats(time_diff: Duration, first: DockerContainerStatEntry, second: DockerContainerStatEntry) -> DockerContainerMetricEntry {
+fn docker_metric_entry_from_two_stats(time_diff: Duration, first: InstantDockerContainerMetricEntry, second: InstantDockerContainerMetricEntry) -> DockerContainerMetricEntry {
     let diff = time_diff.num_milliseconds() as f64 / 1000.0; // seconds
 
     DockerContainerMetricEntry {
