@@ -10,7 +10,8 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
 pub struct InstantCPUMetric  {
@@ -100,6 +101,10 @@ impl Metric for InstantCPUMetric {
 
         Ok(Box::new(InstantCPUMetric { stat, timestamp }))
     }
+
+    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
+        save_cpu_metric(database, hostname, cpu_metric_from_stats(previous, this))
+    }
 }
 
 fn is_cpu_line(spl: &SplitWhitespace) -> Result<bool, CPUMetricError> {
@@ -108,7 +113,7 @@ fn is_cpu_line(spl: &SplitWhitespace) -> Result<bool, CPUMetricError> {
     Ok(first_word.starts_with("cpu") && first_word.len() > 3 && spl_clone.count() == 10)
 }
 
-pub fn cpu_metric_from_stats(first: InstantCPUMetric, second: InstantCPUMetric) -> CPUMetric {
+fn cpu_metric_from_stats(first: &InstantCPUMetric, second: &InstantCPUMetric) -> CPUMetric {
     let time_diff = second.timestamp - first.timestamp;
 
     let first_iter = first.stat.into_iter();
@@ -142,7 +147,7 @@ fn cpu_metric_entry_from_two_stats(time_diff: Duration, first: InstantCPUMetricE
     }
 }
 
-pub async fn save_cpu_metric(database: &Database, hostname: &str, metric: CPUMetric) -> Result<(), CPUMetricError> {
+async fn save_cpu_metric(database: &Database, hostname: &str, metric: CPUMetric) -> Result<(), CPUMetricError> {
     let timestamp = metric.timestamp.clone();
 
     let futures = metric.stat.into_iter()

@@ -22,7 +22,7 @@ use std::env;
 use async_std::task;
 use log::{info, warn};
 
-use crate::cpu::{cpu_metric_from_stats, save_cpu_metric, cleanup_cpu_metric, InstantCPUMetric};
+use crate::cpu::{cleanup_cpu_metric, InstantCPUMetric};
 use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
@@ -77,7 +77,7 @@ async fn main() {
             Ok(v) => {
                 if previous_cpu_stat.is_ok() {
                     let metric = cpu_metric_from_stats(*previous_cpu_stat.unwrap(), *v.clone());
-                    if let Err(err) = save_cpu_metric(&database, &hostname, metric).await {
+                    if let Err(err) = v.save(&database, &metric, &hostname).await {
                         warn!("failed to save cpu metric: {}", err);
                     }
                 }

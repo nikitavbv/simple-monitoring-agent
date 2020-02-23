@@ -14,6 +14,10 @@ custom_error! {pub MetricCollectionError
     DockerClientError{source: DockerClientError} = "docker client error: {source}"
 }
 
+custom_error! {pub MetricSaveError
+    DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed: {source}"
+}
+
 impl From<std::option::NoneError> for MetricCollectionError {
     fn from(_: NoneError) -> Self {
         MetricCollectionError::FailedToParse{description: "NoneError".to_string()}
@@ -43,4 +47,5 @@ impl From<http::uri::InvalidUri> for MetricCollectionError {
 #[async_trait]
 pub trait Metric {
     async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError>;
+    async fn save(&self, mut database: &Database, previous: &Self, hostname: &str) -> Result<(), MetricSaveError>;
 }
