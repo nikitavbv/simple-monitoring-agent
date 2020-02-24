@@ -10,7 +10,8 @@ use async_trait::async_trait;
 use crate::database::Database;
 use std::collections::HashMap;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
 pub struct FilesystemUsageMetric {
@@ -52,6 +53,18 @@ impl Metric for FilesystemUsageMetric {
 
         Ok(Box::new(FilesystemUsageMetric { timestamp, stat }))
     }
+
+    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
+        let metric = metric.clone();
+        let timestamp = metric.timestamp.clone();
+
+        let futures = metric.stat.into_iter()
+            .map(|entry| save_metric_entry(&database, &hostname, timestamp, entry));
+
+        join_all(futures).await?;
+
+        Ok(())
+    }
 }
 
 custom_error!{pub FilesystemUsageMetricError
@@ -70,16 +83,6 @@ impl From<std::num::ParseIntError> for FilesystemUsageMetricError {
     fn from(err: ParseIntError) -> Self {
         FilesystemUsageMetricError::FailedToParse{description: err.to_string()}
     }
-}
-
-pub async fn save_filesystem_usage_metric(database: &Database, hostname: &str, metric: &FilesystemUsageMetric) {
-    let metric = metric.clone();
-    let timestamp = metric.timestamp.clone();
-
-    let futures = metric.stat.into_iter()
-        .map(|entry| save_metric_entry(&database, &hostname, timestamp, entry));
-
-    join_all(futures).await;
 }
 
 async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: FilesystemUsageMetricEntry) -> Result<(), FilesystemUsageMetricError> {

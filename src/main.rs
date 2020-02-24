@@ -114,7 +114,7 @@ async fn main() {
         };
 
         match FilesystemUsageMetric::collect(&database).await {
-            Ok(v) => save_filesystem_usage_metric(&database, &hostname, &v).await,
+            Ok(v) => v.save(&database, &v, &hostname).await,
             Err(err) => warn!("failed to record filesystem usage metric: {}", err)
         };
 
