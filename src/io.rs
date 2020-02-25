@@ -10,7 +10,8 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
 pub struct InstantIOMetric {
@@ -67,6 +68,12 @@ impl Metric for InstantIOMetric {
 
         Ok(Box::new(InstantIOMetric { stat, timestamp }))
     }
+
+    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
+        let metric = io_metric_from_stats(previous, self);
+        save_io_metric(&database, hostname, &metric).await;
+        Ok(())
+    }
 }
 
 custom_error!{pub IOMetricError
@@ -92,7 +99,7 @@ impl From<std::num::ParseIntError> for IOMetricError {
 // /tree/include/linux/types.h?id=v4.4-rc6#n121
 const DEVICE_BLOCK_SIZE: i32 = 512;
 
-pub fn io_metric_from_stats(first: InstantIOMetric, second: InstantIOMetric) -> IOMetric {
+fn io_metric_from_stats(first: &InstantIOMetric, second: &InstantIOMetric) -> IOMetric {
     let time_diff = second.timestamp - first.timestamp;
 
     let first_iter = first.stat.into_iter();
@@ -121,7 +128,7 @@ fn io_metric_entry_from_two_stats(time_diff: Duration, first: InstantIOMetricEnt
     }
 }
 
-pub async fn save_io_metric(database: &Database, hostname: &str, metric: &IOMetric) {
+async fn save_io_metric(database: &Database, hostname: &str, metric: &IOMetric) {
     let metric = metric.clone();
 
     let timestamp = metric.timestamp.clone();

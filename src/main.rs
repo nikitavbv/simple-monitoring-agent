@@ -95,18 +95,18 @@ async fn main() {
         };
 
         match MemoryMetric::collect(&database).await {
-            Ok(v) => match save_memory_metric(&database, &hostname, &v).await {
-                Ok(_) => {},
-                Err(err) => warn!("failed to record memory metric: {}", err)
-            }
+            Ok(v) => if let Err(err) = save_memory_metric(&database, &hostname, &v).await {
+                warn!("failed to record memory metric: {}", err)
+            },
             Err(err) => warn!("failed to collect memory metric: {}", err)
         };
 
         match InstantIOMetric::collect(&database).await {
             Ok(v) => {
                 if previous_io_stat.is_ok() {
-                    let metric = io_metric_from_stats(*previous_io_stat.unwrap(), *v.clone());
-                    save_io_metric(&database, &hostname, &metric).await;
+                    if let Err(err) = save(&database, &previous_io_stat.unwrap(), &hostname).await {
+                        warn!("failed to save io metric: {}", err);
+                    }
                 }
                 previous_io_stat = Ok(v);
             },
