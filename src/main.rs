@@ -87,10 +87,9 @@ async fn main() {
         };
 
         match LoadAverageMetric::collect(&database).await {
-            Ok(v) => match save_load_average_metric(&database, hostname.clone(), *v).await {
-                Ok(_) => {},
-                Err(err) => warn!("failed to record load average metric: {}", err)
-            }
+            Ok(v) => if let Err(err) = v.save(&database, &metric, &hostname).await {
+                warn!("failed to record load average metric: {}", err);
+            },
             Err(err) => warn!("failed to collect load average metric: {}", err)
         };
 
