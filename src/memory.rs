@@ -9,7 +9,8 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use sqlx::{PgConnection, Pool};
 
 pub struct MemoryMetric {
     timestamp: DateTime<Utc>,
@@ -52,6 +53,17 @@ impl Metric for MemoryMetric {
             swap_free: stats.remove("SwapFree:")
         }))
     }
+
+    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
+        sqlx::query!(
+            "insert into metric_memory (hostname, timestamp, total, free, available, buffers, cached, swap_total, swap_free) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            hostname.to_string(), self.timestamp, self.total.unwrap_or(0), self.free.unwrap_or(0),
+            self.available.unwrap_or(0), self.buffers.unwrap_or(0), self.cached.unwrap_or(0),
+            self.swap_total.unwrap_or(0), self.swap_free.unwrap_or(0)
+        ).fetch_one(&mut database).await?;
+
+        Ok(())
+    }
 }
 
 custom_error! {pub MemoryMetricError
@@ -72,15 +84,8 @@ impl From<std::num::ParseFloatError> for MemoryMetricError {
     }
 }
 
-pub async fn save_memory_metric(mut database: &Database, hostname: &str, metric: &MemoryMetric) -> Result<(), MemoryMetricError> {
-    sqlx::query!(
-        "insert into metric_memory (hostname, timestamp, total, free, available, buffers, cached, swap_total, swap_free) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-        hostname.to_string(), metric.timestamp, metric.total.unwrap_or(0), metric.free.unwrap_or(0),
-        metric.available.unwrap_or(0), metric.buffers.unwrap_or(0), metric.cached.unwrap_or(0),
-        metric.swap_total.unwrap_or(0), metric.swap_free.unwrap_or(0)
-    ).fetch_one(&mut database).await?;
+async fn save_memory_metric(mut database: &Database, hostname: &str, metric: &MemoryMetric) -> Result<(), MemoryMetricError> {
 
-    Ok(())
 }
 
 pub async fn cleanup_memory_metric(mut database: &Database) -> Result<(), MemoryMetricError> {
