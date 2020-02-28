@@ -120,7 +120,7 @@ async fn main() {
         match InstantNetworkMetric::collect(&database).await {
             Ok(v) => {
                 if previous_network_stat.is_ok() {
-                    let metric = network_metric_from_stats(&previous_network_stat.unwrap(), &v);
+                    let metric = v.save(&database, &previous_network_stat.unwrap(), &hostname);
                     save_network_metric(&database, &hostname, &metric).await;
                 }
                 previous_network_stat = Ok(v);

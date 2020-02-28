@@ -11,7 +11,8 @@ use async_trait::async_trait;
 use crate::database::Database;
 use std::env;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
 pub struct InstantNetworkMetric {
@@ -68,6 +69,19 @@ impl Metric for InstantNetworkMetric {
 
         Ok(Box::new(InstantNetworkMetric { stat, timestamp }))
     }
+
+    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
+        let metric = network_metric_from_stats(&previous, &self);
+
+        let timestamp = metric.timestamp.clone();
+
+        let futures = metric.stat.into_iter()
+            .map(|entry| save_metric_entry(&database, hostname, &timestamp, entry));
+
+        join_all(futures).await?;
+
+        Ok(())
+    }
 }
 
 custom_error!{pub NetworkMetricError
@@ -92,7 +106,7 @@ fn network_stats_file_name() -> String {
     env::var("NETWORK_STATS_FILE").unwrap_or("/proc/net/dev".to_string())
 }
 
-pub fn network_metric_from_stats(first: &InstantNetworkMetric, second: &InstantNetworkMetric) -> NetworkMetric {
+fn network_metric_from_stats(first: &InstantNetworkMetric, second: &InstantNetworkMetric) -> NetworkMetric {
     let time_diff = second.timestamp - first.timestamp;
 
     let first_iter = first.stat.clone().into_iter();
@@ -117,16 +131,6 @@ fn network_metric_from_two_stats(time_diff: Duration, first: InstantNetworkMetri
         rx,
         tx
     }
-}
-
-pub async fn save_network_metric(database: &Database, hostname: &str, metric: &NetworkMetric) {
-    let metric = metric.clone();
-    let timestamp = metric.timestamp.clone();
-
-    let futures = metric.stat.into_iter()
-        .map(|entry| save_metric_entry(&database, hostname, &timestamp, entry));
-
-    join_all(futures).await;
 }
 
 async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: NetworkMetricEntry) -> Result<(), NetworkMetricError> {
