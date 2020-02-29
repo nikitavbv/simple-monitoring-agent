@@ -142,8 +142,7 @@ async fn main() {
         match NginxInstantMetric::collect(&database).await {
             Ok(v) => {
                 if previous_nginx_stat.is_ok() {
-                    let metric = nginx_metric_from_stats(&previous_nginx_stat.unwrap(), &v);
-                    if let Err(err) = save_nginx_metric(&database, &hostname, &metric).await {
+                    if let Err(err) = v.save(&database, &previous_nginx_stat.unwrap(), &hostname, &metric).await {
                         warn!("failed to record nginx metric: {}", err);
                     }
                 }
