@@ -27,13 +27,13 @@ use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::{save_load_average_metric, cleanup_load_average_metric, LoadAverageMetric};
-use crate::memory::{save_memory_metric, cleanup_memory_metric, MemoryMetric};
-use crate::io::{io_metric_from_stats, save_io_metric, cleanup_io_metric, InstantIOMetric};
+use crate::memory::{cleanup_memory_metric, MemoryMetric};
+use crate::io::{cleanup_io_metric, InstantIOMetric};
 use crate::fs::{FilesystemUsageMetric, save_filesystem_usage_metric, cleanup_fs_metric};
-use crate::network::{network_metric_from_stats, save_network_metric, cleanup_network_metric, InstantNetworkMetric};
+use crate::network::{cleanup_network_metric, InstantNetworkMetric};
 use crate::docker::metric::{docker_metric_from_stats, save_docker_metric, cleanup_docker_metric, InstantDockerContainerMetric};
-use crate::nginx::{nginx_metric_from_stats, save_nginx_metric, cleanup_nginx_metric, NginxInstantMetric};
-use crate::postgres::{postgres_metric_from_stats, save_postgres_metric, cleanup_postgres_metric, InstantPostgresMetric};
+use crate::nginx::{cleanup_nginx_metric, NginxInstantMetric};
+use crate::postgres::{cleanup_postgres_metric, InstantPostgresMetric, PostgresMetric};
 use crate::types::Metric;
 
 const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
@@ -154,8 +154,7 @@ async fn main() {
         match InstantPostgresMetric::collect(&database).await {
             Ok(v) => {
                 if previous_postgres_stat.is_ok() {
-                    let metric = postgres_metric_from_stats(&previous_postgres_stat.unwrap(), &v);
-                    if let Err(err) = save_postgres_metric(&database, &hostname, &metric).await {
+                    if let Err(err) = v.save(&database, &metric, &hostname).await {
                         warn!("failed to record postgres metric: {}", err);
                     }
                 }

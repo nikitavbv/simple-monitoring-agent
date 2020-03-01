@@ -8,7 +8,8 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
 pub struct InstantPostgresMetric {
@@ -105,6 +106,22 @@ SELECT cast(table_name as text), row_estimate, total_bytes AS total
             table_stat
         }))
     }
+
+    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
+        let metric = postgres_metric_from_stats(&previous, &self);
+
+        let timestamp = metric.timestamp.clone();
+
+        let futures = &metric.table_metrics.into_iter()
+            .map(|entry| save_table_metric_entry(&database, hostname, &timestamp, entry));
+
+        try_join(
+            try_join_all(futures),
+            save_database_metric(&database, hostname, &timestamp, metric.database_metric)
+        ).await?;
+
+        Ok(())
+    }
 }
 
 custom_error!{pub PostgresMetricError
@@ -136,22 +153,6 @@ fn table_metric_from_two_stats(first: &DatabaseStat, second: &DatabaseStat) -> D
         tup_updated: second.tup_updated - first.tup_updated,
         tup_deleted: second.tup_deleted - first.tup_deleted
     }
-}
-
-pub async fn save_postgres_metric(database: &Database, hostname: &str, metric: &PostgresMetric) -> Result<(), PostgresMetricError> {
-    let metric = metric.clone();
-
-    let timestamp = metric.timestamp.clone();
-
-    let futures = metric.table_metrics.into_iter()
-        .map(|entry| save_table_metric_entry(&database, hostname, &timestamp, entry));
-
-    try_join(
-        try_join_all(futures),
-        save_database_metric(&database, hostname, &timestamp, metric.database_metric)
-    ).await?;
-
-    Ok(())
 }
 
 async fn save_table_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: TableMetric) -> Result<(), PostgresMetricError> {
