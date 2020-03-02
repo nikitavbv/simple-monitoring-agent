@@ -103,7 +103,7 @@ impl Metric for InstantCPUMetric {
     }
 
     async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
-        save_cpu_metric(database, hostname, cpu_metric_from_stats(previous, this))
+        save_cpu_metric(database, hostname, cpu_metric_from_stats(&previous, &self))
     }
 }
 

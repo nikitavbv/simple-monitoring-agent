@@ -55,10 +55,9 @@ impl Metric for FilesystemUsageMetric {
     }
 
     async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
-        let metric = metric.clone();
-        let timestamp = metric.timestamp.clone();
+        let timestamp = &self.timestamp.clone();
 
-        let futures = metric.stat.into_iter()
+        let futures = self.stat.into_iter()
             .map(|entry| save_metric_entry(&database, &hostname, timestamp, entry));
 
         join_all(futures).await?;

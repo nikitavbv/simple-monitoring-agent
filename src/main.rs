@@ -26,10 +26,10 @@ use crate::cpu::{cleanup_cpu_metric, InstantCPUMetric};
 use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
-use crate::load_avg::{save_load_average_metric, cleanup_load_average_metric, LoadAverageMetric};
+use crate::load_avg::{cleanup_load_average_metric, LoadAverageMetric};
 use crate::memory::{cleanup_memory_metric, MemoryMetric};
 use crate::io::{cleanup_io_metric, InstantIOMetric};
-use crate::fs::{FilesystemUsageMetric, save_filesystem_usage_metric, cleanup_fs_metric};
+use crate::fs::{FilesystemUsageMetric, cleanup_fs_metric};
 use crate::network::{cleanup_network_metric, InstantNetworkMetric};
 use crate::docker::metric::{docker_metric_from_stats, save_docker_metric, cleanup_docker_metric, InstantDockerContainerMetric};
 use crate::nginx::{cleanup_nginx_metric, NginxInstantMetric};
@@ -76,8 +76,7 @@ async fn main() {
         match InstantCPUMetric::collect(&database).await {
             Ok(v) => {
                 if previous_cpu_stat.is_ok() {
-                    let metric = cpu_metric_from_stats(*previous_cpu_stat.unwrap(), *v.clone());
-                    if let Err(err) = v.save(&database, &metric, &hostname).await {
+                    if let Err(err) = v.save(&database, &previous_cpu_stat.unwrap(), &hostname).await {
                         warn!("failed to save cpu metric: {}", err);
                     }
                 }
@@ -87,14 +86,14 @@ async fn main() {
         };
 
         match LoadAverageMetric::collect(&database).await {
-            Ok(v) => if let Err(err) = v.save(&database, &metric, &hostname).await {
+            Ok(v) => if let Err(err) = v.save(&database, &v, &hostname).await {
                 warn!("failed to record load average metric: {}", err);
             },
             Err(err) => warn!("failed to collect load average metric: {}", err)
         };
 
         match MemoryMetric::collect(&database).await {
-            Ok(v) => if let Err(err) = save_memory_metric(&database, &hostname, &v).await {
+            Ok(v) => if let Err(err) = v.save(&database, &v, &hostname).await {
                 warn!("failed to record memory metric: {}", err)
             },
             Err(err) => warn!("failed to collect memory metric: {}", err)
@@ -103,7 +102,7 @@ async fn main() {
         match InstantIOMetric::collect(&database).await {
             Ok(v) => {
                 if previous_io_stat.is_ok() {
-                    if let Err(err) = save(&database, &previous_io_stat.unwrap(), &hostname).await {
+                    if let Err(err) = v.save(&database, &previous_io_stat.unwrap(), &hostname).await {
                         warn!("failed to save io metric: {}", err);
                     }
                 }
@@ -120,8 +119,9 @@ async fn main() {
         match InstantNetworkMetric::collect(&database).await {
             Ok(v) => {
                 if previous_network_stat.is_ok() {
-                    let metric = v.save(&database, &previous_network_stat.unwrap(), &hostname);
-                    save_network_metric(&database, &hostname, &metric).await;
+                    if let Err(err) = v.save(&database, &previous_network_stat.unwrap(), &hostname) {
+                        warn!("failed to save network metric: {}", err);
+                    }
                 }
                 previous_network_stat = Ok(v);
             },
@@ -142,7 +142,7 @@ async fn main() {
         match NginxInstantMetric::collect(&database).await {
             Ok(v) => {
                 if previous_nginx_stat.is_ok() {
-                    if let Err(err) = v.save(&database, &previous_nginx_stat.unwrap(), &hostname, &metric).await {
+                    if let Err(err) = v.save(&database, &previous_nginx_stat.unwrap(), &hostname).await {
                         warn!("failed to record nginx metric: {}", err);
                     }
                 }
