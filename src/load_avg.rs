@@ -63,7 +63,7 @@ impl From<std::num::ParseFloatError> for LoadAverageMetricError {
     }
 }
 
-async fn cleanup_load_average_metric(mut database: &Database) -> Result<(), LoadAverageMetricError> {
+pub async fn cleanup_load_average_metric(mut database: &Database) -> Result<(), LoadAverageMetricError> {
     let min_timestamp = Utc::now() - get_max_metrics_age();
 
     sqlx::query!("delete from metric_load_average where timestamp < $1 returning 1 as result", min_timestamp)

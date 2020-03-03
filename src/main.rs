@@ -154,7 +154,7 @@ async fn main() {
         match InstantPostgresMetric::collect(&database).await {
             Ok(v) => {
                 if previous_postgres_stat.is_ok() {
-                    if let Err(err) = v.save(&database, &metric, &hostname).await {
+                    if let Err(err) = v.save(&database, &previous_postgres_stat.unwrap(), &hostname).await {
                         warn!("failed to record postgres metric: {}", err);
                     }
                 }

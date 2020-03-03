@@ -98,7 +98,7 @@ fn nginx_metric_from_stats(first: &NginxInstantMetric, second: &NginxInstantMetr
     }
 }
 
-async fn cleanup_nginx_metric(mut database: &Database) -> Result<(), NginxMetricError> {
+pub async fn cleanup_nginx_metric(mut database: &Database) -> Result<(), NginxMetricError> {
     let min_timestamp = Utc::now() - get_max_metrics_age();
 
     sqlx::query!("delete from metric_nginx where timestamp < $1 returning 1 as result", min_timestamp)
