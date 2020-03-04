@@ -4,7 +4,7 @@ use std::process::Command;
 
 use chrono::{Utc, DateTime};
 use custom_error::custom_error;
-use futures::future::join_all;
+use futures::future::try_join_all;
 use async_trait::async_trait;
 
 use crate::database::Database;
@@ -58,9 +58,9 @@ impl Metric for FilesystemUsageMetric {
         let timestamp = &self.timestamp.clone();
 
         let futures = self.stat.into_iter()
-            .map(|entry| save_metric_entry(&database, &hostname, timestamp, entry));
+            .map(|entry| save_metric_entry(&database, &hostname, *timestamp, entry));
 
-        join_all(futures).await?;
+        try_join_all(futures).await?;
 
         Ok(())
     }
@@ -84,7 +84,7 @@ impl From<std::num::ParseIntError> for FilesystemUsageMetricError {
     }
 }
 
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: FilesystemUsageMetricEntry) -> Result<(), FilesystemUsageMetricError> {
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: FilesystemUsageMetricEntry) -> Result<(), MetricSaveError> {
     sqlx::query!(
         "insert into metric_fs (hostname, timestamp, filesystem, total, used) values ($1, $2, $3, $4, $5)",
         hostname.to_string(), timestamp, entry.filesystem, entry.total, entry.used

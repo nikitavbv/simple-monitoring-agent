@@ -4,7 +4,7 @@ use std::num::ParseIntError;
 
 use async_std::fs::read_to_string;
 use custom_error::custom_error;
-use futures::future::join_all;
+use futures::future::try_join_all;
 use chrono::{Utc, DateTime, Duration};
 use async_trait::async_trait;
 
@@ -78,7 +78,7 @@ impl Metric for InstantNetworkMetric {
         let futures = metric.stat.into_iter()
             .map(|entry| save_metric_entry(&database, hostname, &timestamp, entry));
 
-        join_all(futures).await?;
+        try_join_all(futures).await?;
 
         Ok(())
     }
@@ -133,7 +133,7 @@ fn network_metric_from_two_stats(time_diff: Duration, first: InstantNetworkMetri
     }
 }
 
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: NetworkMetricEntry) -> Result<(), NetworkMetricError> {
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: NetworkMetricEntry) -> Result<(), MetricSaveError> {
     sqlx::query!(
         "insert into metric_network (hostname, timestamp, device, rx, tx) values ($1, $2, $3, $4, $5)",
         hostname.to_string(), *timestamp, entry.device.to_string(), entry.rx, entry.tx

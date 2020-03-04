@@ -33,7 +33,7 @@ use crate::fs::{FilesystemUsageMetric, cleanup_fs_metric};
 use crate::network::{cleanup_network_metric, InstantNetworkMetric};
 use crate::docker::metric::{docker_metric_from_stats, save_docker_metric, cleanup_docker_metric, InstantDockerContainerMetric};
 use crate::nginx::{cleanup_nginx_metric, NginxInstantMetric};
-use crate::postgres::{cleanup_postgres_metric, InstantPostgresMetric, PostgresMetric};
+use crate::postgres::{cleanup_postgres_metric, InstantPostgresMetric};
 use crate::types::Metric;
 
 const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
@@ -112,20 +112,24 @@ async fn main() {
         };
 
         match FilesystemUsageMetric::collect(&database).await {
-            Ok(v) => v.save(&database, &v, &hostname).await,
+            Ok(v) => if let Err(err) = v.save(&database, &v, &hostname).await {
+                warn!("failed to save filesystem metric: {}", err);
+            },
             Err(err) => warn!("failed to record filesystem usage metric: {}", err)
         };
 
         match InstantNetworkMetric::collect(&database).await {
             Ok(v) => {
                 if previous_network_stat.is_ok() {
-                    if let Err(err) = v.save(&database, &previous_network_stat.unwrap(), &hostname) {
+                    if let Err(err) = v.save(&database, &previous_network_stat.unwrap(), &hostname).await {
                         warn!("failed to save network metric: {}", err);
                     }
                 }
                 previous_network_stat = Ok(v);
             },
-            Err(err) => warn!("failed to get network stats: {}", err)
+            Err(err) => {
+                warn!("failed to get network stats: {}", err);
+            }
         };
 
         match InstantDockerContainerMetric::collect(&mut database).await {

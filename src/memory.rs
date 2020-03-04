@@ -84,10 +84,6 @@ impl From<std::num::ParseFloatError> for MemoryMetricError {
     }
 }
 
-async fn save_memory_metric(mut database: &Database, hostname: &str, metric: &MemoryMetric) -> Result<(), MemoryMetricError> {
-
-}
-
 pub async fn cleanup_memory_metric(mut database: &Database) -> Result<(), MemoryMetricError> {
     let min_timestamp = Utc::now() - get_max_metrics_age();
 

@@ -103,7 +103,15 @@ impl Metric for InstantCPUMetric {
     }
 
     async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
-        save_cpu_metric(database, hostname, cpu_metric_from_stats(&previous, &self))
+        let metric = cpu_metric_from_stats(&previous, &self);
+        let timestamp = metric.timestamp.clone();
+
+        let futures = metric.stat.into_iter()
+            .map(|entry| save_metric_entry(database, &hostname, timestamp, entry));
+
+        try_join_all(futures).await?;
+
+        Ok(())
     }
 }
 
@@ -147,18 +155,7 @@ fn cpu_metric_entry_from_two_stats(time_diff: Duration, first: InstantCPUMetricE
     }
 }
 
-async fn save_cpu_metric(database: &Database, hostname: &str, metric: CPUMetric) -> Result<(), CPUMetricError> {
-    let timestamp = metric.timestamp.clone();
-
-    let futures = metric.stat.into_iter()
-        .map(|entry| save_metric_entry(database, &hostname, timestamp, entry));
-
-    try_join_all(futures).await?;
-
-    Ok(())
-}
-
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: CPUMetricEntry) -> Result<(), CPUMetricError>{
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: DateTime<Utc>, entry: CPUMetricEntry) -> Result<(), MetricSaveError> {
     sqlx::query!(
         "insert into metric_cpu (hostname, timestamp, cpu, \"user\", nice, system, idle, iowait, irq, softirq, guest, steal, guest_nice) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning cpu",
         hostname.to_string(), timestamp,

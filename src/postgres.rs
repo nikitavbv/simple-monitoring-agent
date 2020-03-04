@@ -112,7 +112,7 @@ SELECT cast(table_name as text), row_estimate, total_bytes AS total
 
         let timestamp = metric.timestamp.clone();
 
-        let futures = &metric.table_metrics.into_iter()
+        let futures = metric.table_metrics.into_iter()
             .map(|entry| save_table_metric_entry(&database, hostname, &timestamp, entry));
 
         try_join(
@@ -155,7 +155,7 @@ fn table_metric_from_two_stats(first: &DatabaseStat, second: &DatabaseStat) -> D
     }
 }
 
-async fn save_table_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: TableMetric) -> Result<(), PostgresMetricError> {
+async fn save_table_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: TableMetric) -> Result<(), MetricSaveError> {
     sqlx::query!(
         "insert into metric_postgres_tables (hostname, timestamp, name, rows, total_bytes) values ($1, $2, $3, $4, $5) returning hostname",
         hostname.to_string(), *timestamp, entry.table, entry.rows, entry.total_bytes
@@ -164,7 +164,7 @@ async fn save_table_metric_entry(mut database: &Database, hostname: &str, timest
     Ok(())
 }
 
-async fn save_database_metric(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: DatabaseMetric) -> Result<(), PostgresMetricError> {
+async fn save_database_metric(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: DatabaseMetric) -> Result<(), MetricSaveError> {
     sqlx::query!(
         "insert into metric_postgres_database (hostname, timestamp, returned, fetched, inserted, updated, deleted) values ($1, $2, $3, $4, $5, $6, $7)",
         hostname.to_string(), *timestamp, entry.tup_returned, entry.tup_fetched, entry.tup_inserted, entry.tup_updated, entry.tup_deleted

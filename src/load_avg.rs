@@ -38,7 +38,7 @@ impl Metric for LoadAverageMetric {
     async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
         sqlx::query!(
             "insert into metric_load_average (hostname, timestamp, one, five, fifteen) values ($1, $2, $3, $4, $5) returning hostname",
-            hostname, self.timestamp, self.one, self.five, self.fifteen
+            hostname.to_string(), self.timestamp, self.one, self.five, self.fifteen
         ).fetch_one(&mut database).await?;
 
         Ok(())
