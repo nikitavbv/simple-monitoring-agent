@@ -31,7 +31,7 @@ use crate::memory::{cleanup_memory_metric, MemoryMetric};
 use crate::io::{cleanup_io_metric, InstantIOMetric};
 use crate::fs::{FilesystemUsageMetric, cleanup_fs_metric};
 use crate::network::{cleanup_network_metric, InstantNetworkMetric};
-use crate::docker::metric::{docker_metric_from_stats, save_docker_metric, cleanup_docker_metric, InstantDockerContainerMetric};
+use crate::docker::metric::{docker_metric_from_stats, cleanup_docker_metric, InstantDockerContainerMetric};
 use crate::nginx::{cleanup_nginx_metric, NginxInstantMetric};
 use crate::postgres::{cleanup_postgres_metric, InstantPostgresMetric};
 use crate::types::Metric;
@@ -135,8 +135,9 @@ async fn main() {
         match InstantDockerContainerMetric::collect(&mut database).await {
             Ok(v) => {
                 if previous_docker_stat.is_ok() {
-                    let metric = docker_metric_from_stats(&previous_docker_stat.unwrap(), &v);
-                    save_docker_metric(&mut database, &hostname, &metric).await;
+                    if let Err(err) = v.save(&database, &previous_docker_stat.unwrap(), &hostname).await {
+                        warn!("failed to save docker metric: {}", err);
+                    }
                 }
                 previous_docker_stat = Ok(v);
             },

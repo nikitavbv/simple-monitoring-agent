@@ -1,6 +1,6 @@
 use chrono::{Utc, DateTime, Duration};
 use custom_error::custom_error;
-use futures::future::join_all;
+use futures::future::{join_all, try_join_all};
 use log::warn;
 
 use sqlx::{PgConnection, Pool};
@@ -10,7 +10,7 @@ use crate::database::Database;
 use crate::docker::client::{containers, DockerClientError, stats, Container, ContainerStats};
 use futures::FutureExt;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError};
 
 #[derive(Debug, Clone)]
 pub struct InstantDockerContainerMetric {
@@ -88,6 +88,20 @@ impl Metric for InstantDockerContainerMetric {
 
         Ok(Box::new(InstantDockerContainerMetric { timestamp, stat }))
     }
+
+    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
+        let metric = docker_metric_from_stats(&previous, &self);
+        let metric = metric.clone();
+
+        let timestamp = metric.timestamp.clone();
+
+        let futures = metric.stat.into_iter()
+            .map(|entry| save_metric_entry(&mut database, hostname, &timestamp, entry));
+
+        try_join_all(futures).await?;
+
+        Ok(())
+    }
 }
 
 pub fn docker_metric_from_stats(first: &InstantDockerContainerMetric, second: &InstantDockerContainerMetric) -> DockerContainerMetric {
@@ -126,18 +140,7 @@ fn docker_metric_entry_from_two_stats(time_diff: Duration, first: InstantDockerC
     }
 }
 
-pub async fn save_docker_metric(mut database: &Database, hostname: &str, metric: &DockerContainerMetric) {
-    let metric = metric.clone();
-
-    let timestamp = metric.timestamp.clone();
-
-    let futures = metric.stat.into_iter()
-        .map(|entry| save_metric_entry(&mut database, hostname, &timestamp, entry));
-
-    join_all(futures).await;
-}
-
-async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: DockerContainerMetricEntry) -> Result<(), DockerMetricError> {
+async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: DockerContainerMetricEntry) -> Result<(), MetricSaveError> {
     sqlx::query!(
         "insert into metric_docker_containers (hostname, timestamp, name, state, cpu_usage, memory_usage, memory_cache, network_tx, network_rx) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning name",
         hostname.to_string(), *timestamp, entry.name, entry.state, entry.cpu_usage, entry.memory_usage as i64, entry.memory_cache as i64, entry.network_tx, entry.network_rx
