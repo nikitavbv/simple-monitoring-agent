@@ -102,9 +102,9 @@ const DEVICE_BLOCK_SIZE: i32 = 512;
 fn io_metric_from_stats(first: &InstantIOMetric, second: &InstantIOMetric) -> IOMetric {
     let time_diff = second.timestamp - first.timestamp;
 
-    let first_iter = first.stat.into_iter();
+    let first_iter = first.clone().stat.into_iter();
 
-    let stat: Vec<IOMetricEntry> = second.stat.into_iter()
+    let stat: Vec<IOMetricEntry> = second.clone().stat.into_iter()
         .filter_map(|v| first_iter.clone()
             .find(|item| item.device_name == v.device_name)
             .map(|item| (item, v))

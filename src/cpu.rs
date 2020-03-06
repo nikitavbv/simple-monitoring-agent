@@ -122,11 +122,11 @@ fn is_cpu_line(spl: &SplitWhitespace) -> Result<bool, CPUMetricError> {
 }
 
 fn cpu_metric_from_stats(first: &InstantCPUMetric, second: &InstantCPUMetric) -> CPUMetric {
-    let time_diff = second.timestamp - first.timestamp;
+    let time_diff = second.clone().timestamp - first.clone().timestamp;
 
-    let first_iter = first.stat.into_iter();
+    let first_iter = first.clone().stat.into_iter();
 
-    let stat: Vec<CPUMetricEntry> = second.stat.into_iter()
+    let stat: Vec<CPUMetricEntry> = second.clone().stat.into_iter()
         .filter_map(|v| first_iter.clone()
             .find(|item| item.cpu == v.cpu)
             .map(|item| (item, v))
