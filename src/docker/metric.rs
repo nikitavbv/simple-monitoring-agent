@@ -10,7 +10,7 @@ use crate::database::Database;
 use crate::docker::client::{containers, DockerClientError, stats, Container, ContainerStats};
 use futures::FutureExt;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
 
 #[derive(Debug, Clone)]
 pub struct InstantDockerContainerMetric {
@@ -102,6 +102,15 @@ impl Metric for InstantDockerContainerMetric {
 
         Ok(())
     }
+
+    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+        let min_timestamp = Utc::now() - get_max_metrics_age();
+
+        sqlx::query!("delete from metric_docker_containers where timestamp < $1 returning 1 as result", min_timestamp)
+            .fetch_one(&mut database).await?;
+
+        Ok(())
+    }
 }
 
 pub fn docker_metric_from_stats(first: &InstantDockerContainerMetric, second: &InstantDockerContainerMetric) -> DockerContainerMetric {
@@ -145,15 +154,6 @@ async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &
         "insert into metric_docker_containers (hostname, timestamp, name, state, cpu_usage, memory_usage, memory_cache, network_tx, network_rx) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning name",
         hostname.to_string(), *timestamp, entry.name, entry.state, entry.cpu_usage, entry.memory_usage as i64, entry.memory_cache as i64, entry.network_tx, entry.network_rx
     ).fetch_one(&mut database).await?;
-
-    Ok(())
-}
-
-pub async fn cleanup_docker_metric(mut database: &Database) -> Result<(), DockerMetricError> {
-    let min_timestamp = Utc::now() - get_max_metrics_age();
-
-    sqlx::query!("delete from metric_docker_containers where timestamp < $1 returning 1 as result", min_timestamp)
-        .fetch_one(&mut database).await?;
 
     Ok(())
 }

@@ -31,7 +31,7 @@ use crate::memory::{cleanup_memory_metric, MemoryMetric};
 use crate::io::{cleanup_io_metric, InstantIOMetric};
 use crate::fs::{FilesystemUsageMetric, cleanup_fs_metric};
 use crate::network::{cleanup_network_metric, InstantNetworkMetric};
-use crate::docker::metric::{docker_metric_from_stats, cleanup_docker_metric, InstantDockerContainerMetric};
+use crate::docker::metric::{docker_metric_from_stats, InstantDockerContainerMetric, DockerContainerMetric};
 use crate::nginx::{cleanup_nginx_metric, NginxInstantMetric};
 use crate::postgres::{cleanup_postgres_metric, InstantPostgresMetric};
 use crate::types::Metric;
@@ -170,7 +170,7 @@ async fn main() {
 
         if iter_count % METRICS_CLEANUP_INTERVAL == 0 {
             // time to clean up
-            if let Err(err) = cleanup_docker_metric(&database).await {
+            if let Err(err) = InstantDockerContainerMetric::cleanup(&database).await {
                 warn!("docker metric cleanup failed: {}", err);
             }
 
