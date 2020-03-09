@@ -22,7 +22,7 @@ use std::env;
 use async_std::task;
 use log::{info, warn};
 
-use crate::cpu::{cleanup_cpu_metric, InstantCPUMetric};
+use crate::cpu::InstantCPUMetric;
 use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
@@ -174,7 +174,7 @@ async fn main() {
                 warn!("docker metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = cleanup_cpu_metric(&database).await {
+            if let Err(err) = InstantCPUMetric::cleanup(&database).await {
                 warn!("cpu metric cleanup failed: {}", err);
             }
 

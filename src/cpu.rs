@@ -10,7 +10,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -113,6 +113,15 @@ impl Metric for InstantCPUMetric {
 
         Ok(())
     }
+
+    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+        let min_timestamp = Utc::now() - get_max_metrics_age();
+
+        sqlx::query!("delete from metric_cpu where timestamp < $1 returning 1 as result", min_timestamp)
+            .fetch_one(&mut database).await?;
+
+        Ok(())
+    }
 }
 
 fn is_cpu_line(spl: &SplitWhitespace) -> Result<bool, CPUMetricError> {
@@ -163,15 +172,6 @@ async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: D
         entry.iowait as i32, entry.irq as i32, entry.softirq as i32, entry.guest as i32, entry.steal as i32,
         entry.guest_nice as i32
     ).fetch_one(&mut database).await?;
-
-    Ok(())
-}
-
-pub async fn cleanup_cpu_metric(mut database: &Database) -> Result<(), CPUMetricError> {
-    let min_timestamp = Utc::now() - get_max_metrics_age();
-
-    sqlx::query!("delete from metric_cpu where timestamp < $1 returning 1 as result", min_timestamp)
-        .fetch_one(&mut database).await?;
 
     Ok(())
 }
