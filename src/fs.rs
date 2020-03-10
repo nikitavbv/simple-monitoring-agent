@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use crate::database::Database;
 use std::collections::HashMap;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -64,6 +64,15 @@ impl Metric for FilesystemUsageMetric {
 
         Ok(())
     }
+
+    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+        let min_timestamp = Utc::now() - get_max_metrics_age();
+
+        sqlx::query!("delete from metric_fs where timestamp < $1 returning 1 as result", min_timestamp)
+            .fetch_one(&mut database).await?;
+
+        Ok(())
+    }
 }
 
 custom_error!{pub FilesystemUsageMetricError
@@ -89,15 +98,6 @@ async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: D
         "insert into metric_fs (hostname, timestamp, filesystem, total, used) values ($1, $2, $3, $4, $5)",
         hostname.to_string(), timestamp, entry.filesystem, entry.total, entry.used
     ).fetch_one(&mut database).await?;
-
-    Ok(())
-}
-
-pub async fn cleanup_fs_metric(mut database: &Database) -> Result<(), FilesystemUsageMetricError> {
-    let min_timestamp = Utc::now() - get_max_metrics_age();
-
-    sqlx::query!("delete from metric_fs where timestamp < $1 returning 1 as result", min_timestamp)
-        .fetch_one(&mut database).await?;
 
     Ok(())
 }
