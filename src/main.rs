@@ -28,7 +28,7 @@ use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::{cleanup_load_average_metric, LoadAverageMetric};
 use crate::memory::{cleanup_memory_metric, MemoryMetric};
-use crate::io::{cleanup_io_metric, InstantIOMetric};
+use crate::io::InstantIOMetric;
 use crate::fs::FilesystemUsageMetric;
 use crate::network::{cleanup_network_metric, InstantNetworkMetric};
 use crate::docker::metric::{docker_metric_from_stats, InstantDockerContainerMetric, DockerContainerMetric};
@@ -182,7 +182,7 @@ async fn main() {
                 warn!("fs metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = cleanup_io_metric(&database).await {
+            if let Err(err) = InstantIOMetric::cleanup(&database).await {
                 warn!("io metric cleanup failed: {}", err);
             }
 
