@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
 use sqlx::{PgConnection, Pool};
 
 pub struct LoadAverageMetric {
@@ -43,6 +43,15 @@ impl Metric for LoadAverageMetric {
 
         Ok(())
     }
+
+    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+        let min_timestamp = Utc::now() - get_max_metrics_age();
+
+        sqlx::query!("delete from metric_load_average where timestamp < $1 returning 1 as result", min_timestamp)
+            .fetch_one(&mut database).await?;
+
+        Ok(())
+    }
 }
 
 custom_error! {pub LoadAverageMetricError
@@ -61,13 +70,4 @@ impl From<std::num::ParseFloatError> for LoadAverageMetricError {
     fn from(err: ParseFloatError) -> Self {
         LoadAverageMetricError::FailedToParse{description: err.to_string()}
     }
-}
-
-pub async fn cleanup_load_average_metric(mut database: &Database) -> Result<(), LoadAverageMetricError> {
-    let min_timestamp = Utc::now() - get_max_metrics_age();
-
-    sqlx::query!("delete from metric_load_average where timestamp < $1 returning 1 as result", min_timestamp)
-        .fetch_one(&mut database).await?;
-
-    Ok(())
 }
