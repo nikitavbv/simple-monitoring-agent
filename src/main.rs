@@ -27,7 +27,7 @@ use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::LoadAverageMetric;
-use crate::memory::{cleanup_memory_metric, MemoryMetric};
+use crate::memory::MemoryMetric;
 use crate::io::InstantIOMetric;
 use crate::fs::FilesystemUsageMetric;
 use crate::network::{cleanup_network_metric, InstantNetworkMetric};
@@ -190,7 +190,7 @@ async fn main() {
                 warn!("load average metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = cleanup_memory_metric(&database).await {
+            if let Err(err) = MemoryMetric::cleanup(&database).await {
                 warn!("memory metric cleanup failed: {}", err);
             }
 
