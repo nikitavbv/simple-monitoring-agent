@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use crate::database::Database;
 use std::env;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -82,6 +82,15 @@ impl Metric for InstantNetworkMetric {
 
         Ok(())
     }
+
+    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+        let min_timestamp = Utc::now() - get_max_metrics_age();
+
+        sqlx::query!("delete from metric_cpu where timestamp < $1 returning 1 as result", min_timestamp)
+            .fetch_one(&mut database).await?;
+
+        Ok(())
+    }
 }
 
 custom_error!{pub NetworkMetricError
@@ -138,15 +147,6 @@ async fn save_metric_entry(mut database: &Database, hostname: &str, timestamp: &
         "insert into metric_network (hostname, timestamp, device, rx, tx) values ($1, $2, $3, $4, $5)",
         hostname.to_string(), *timestamp, entry.device.to_string(), entry.rx, entry.tx
     ).fetch_one(&mut database).await?;
-
-    Ok(())
-}
-
-pub async fn cleanup_network_metric(mut database: &Database) -> Result<(), NetworkMetricError> {
-    let min_timestamp = Utc::now() - get_max_metrics_age();
-
-    sqlx::query!("delete from metric_cpu where timestamp < $1 returning 1 as result", min_timestamp)
-        .fetch_one(&mut database).await?;
 
     Ok(())
 }
