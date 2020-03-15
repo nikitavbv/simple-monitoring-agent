@@ -32,7 +32,7 @@ use crate::io::InstantIOMetric;
 use crate::fs::FilesystemUsageMetric;
 use crate::network::InstantNetworkMetric;
 use crate::docker::metric::{docker_metric_from_stats, InstantDockerContainerMetric, DockerContainerMetric};
-use crate::nginx::{cleanup_nginx_metric, NginxInstantMetric};
+use crate::nginx::NginxInstantMetric;
 use crate::postgres::{cleanup_postgres_metric, InstantPostgresMetric};
 use crate::types::Metric;
 
@@ -112,7 +112,7 @@ async fn main() {
         };
 
         match FilesystemUsageMetric::collect(&database).await {
-            Ok(v) => if let Err(err) = v.save(&database, &v, &hostname).await {
+            Ok(v) => if let Err(err ) = v.save(&database, &v, &hostname).await {
                 warn!("failed to save filesystem metric: {}", err);
             },
             Err(err) => warn!("failed to record filesystem usage metric: {}", err)
@@ -198,7 +198,7 @@ async fn main() {
                 warn!("database metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = cleanup_nginx_metric(&database).await {
+            if let Err(err) = NginxInstantMetric::cleanup(&database).await {
                 warn!("nginx metric cleanup failed: {}", err);
             }
 

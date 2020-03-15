@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -49,6 +49,15 @@ impl Metric for NginxInstantMetric {
             "insert into metric_nginx (hostname, timestamp, handled_requests) values ($1, $2, $3) returning hostname",
             hostname.to_string(), metric.timestamp, metric.handled_requests as i32
         ).fetch_one(&mut database).await?;
+
+        Ok(())
+    }
+
+    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+        let min_timestamp = Utc::now() - get_max_metrics_age();
+
+        sqlx::query!("delete from metric_nginx where timestamp < $1 returning 1 as result", min_timestamp)
+            .fetch_one(&mut database).await?;
 
         Ok(())
     }
@@ -96,13 +105,4 @@ fn nginx_metric_from_stats(first: &NginxInstantMetric, second: &NginxInstantMetr
         timestamp: second.timestamp,
         handled_requests: ((second.handled_requests - first.handled_requests) / time_diff) as u32
     }
-}
-
-pub async fn cleanup_nginx_metric(mut database: &Database) -> Result<(), NginxMetricError> {
-    let min_timestamp = Utc::now() - get_max_metrics_age();
-
-    sqlx::query!("delete from metric_nginx where timestamp < $1 returning 1 as result", min_timestamp)
-        .fetch_one(&mut database).await?;
-
-    Ok(())
 }
