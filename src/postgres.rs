@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -122,6 +122,19 @@ SELECT cast(table_name as text), row_estimate, total_bytes AS total
 
         Ok(())
     }
+
+    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+        let min_timestamp = Utc::now() - get_max_metrics_age();
+
+        try_join(
+            sqlx::query!("delete from metric_postgres_tables where timestamp < $1 returning 1 as result", min_timestamp)
+                .fetch_one(&mut database.clone()),
+            sqlx::query!("delete from metric_postgres_database where timestamp < $1 returning 1 as result", min_timestamp)
+                .fetch_one(&mut database)
+        ).await?;
+
+        Ok(())
+    }
 }
 
 custom_error!{pub PostgresMetricError
@@ -169,19 +182,6 @@ async fn save_database_metric(mut database: &Database, hostname: &str, timestamp
         "insert into metric_postgres_database (hostname, timestamp, returned, fetched, inserted, updated, deleted) values ($1, $2, $3, $4, $5, $6, $7)",
         hostname.to_string(), *timestamp, entry.tup_returned, entry.tup_fetched, entry.tup_inserted, entry.tup_updated, entry.tup_deleted
     ).fetch_one(&mut database).await?;
-
-    Ok(())
-}
-
-pub async fn cleanup_postgres_metric(mut database: &Database) -> Result<(), PostgresMetricError> {
-    let min_timestamp = Utc::now() - get_max_metrics_age();
-
-    try_join(
-        sqlx::query!("delete from metric_postgres_tables where timestamp < $1 returning 1 as result", min_timestamp)
-            .fetch_one(&mut database.clone()),
-        sqlx::query!("delete from metric_postgres_database where timestamp < $1 returning 1 as result", min_timestamp)
-            .fetch_one(&mut database)
-    ).await?;
 
     Ok(())
 }

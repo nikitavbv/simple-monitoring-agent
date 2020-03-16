@@ -33,7 +33,7 @@ use crate::fs::FilesystemUsageMetric;
 use crate::network::InstantNetworkMetric;
 use crate::docker::metric::{docker_metric_from_stats, InstantDockerContainerMetric, DockerContainerMetric};
 use crate::nginx::NginxInstantMetric;
-use crate::postgres::{cleanup_postgres_metric, InstantPostgresMetric};
+use crate::postgres::InstantPostgresMetric;
 use crate::types::Metric;
 
 const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
@@ -202,7 +202,7 @@ async fn main() {
                 warn!("nginx metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = cleanup_postgres_metric(&database).await {
+            if let Err(err) = PostgresMetric::cleanup(&database).await {
                 warn!("postgres metric cleanup failed: {}", err);
             }
         }
