@@ -202,7 +202,7 @@ async fn main() {
                 warn!("nginx metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = DatabaseMetric::cleanup(&database).await {
+            if let Err(err) = InstantPostgresMetric::cleanup(&database).await {
                 warn!("postgres metric cleanup failed: {}", err);
             }
         }
