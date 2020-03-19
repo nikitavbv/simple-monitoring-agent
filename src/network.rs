@@ -86,7 +86,7 @@ impl Metric for InstantNetworkMetric {
     async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
         let min_timestamp = Utc::now() - get_max_metrics_age();
 
-        sqlx::query!("delete from metric_cpu where timestamp < $1 returning 1 as result", min_timestamp)
+        sqlx::query!("delete from metric_network where timestamp < $1 returning 1 as result", min_timestamp)
             .fetch_one(&mut database).await?;
 
         Ok(())
