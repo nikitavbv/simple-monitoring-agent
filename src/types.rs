@@ -50,7 +50,11 @@ impl From<http::uri::InvalidUri> for MetricCollectionError {
 
 #[async_trait]
 pub trait Metric {
-    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError>;
-    async fn save(&self, mut database: &Database, previous: &Self, hostname: &str) -> Result<(), MetricSaveError>;
-    async fn cleanup(mut database: &Database) -> Result<(), MetricCleanupError>;
+}
+
+#[async_trait]
+pub trait MetricCollector<T, E> {
+    async fn collect(&self, mut database: &Database) -> Result<Box<T>, MetricCollectionError>;
+    async fn save(&self, previous: &T, metric: &T, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError>;
+    async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError>;
 }

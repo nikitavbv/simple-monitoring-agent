@@ -10,7 +10,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -76,8 +76,15 @@ impl From<std::num::ParseIntError> for CPUMetricError {
 
 #[async_trait]
 impl Metric for InstantCPUMetric {
+}
 
-    async fn collect(mut database: &Database) -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
+pub struct CpuMetricCollector {
+}
+
+#[async_trait]
+impl MetricCollector<InstantCPUMetric> for CpuMetricCollector {
+
+    async fn collect(&self, mut database: &Database) -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string("/proc/stat").await?.lines()
@@ -102,8 +109,8 @@ impl Metric for InstantCPUMetric {
         Ok(Box::new(InstantCPUMetric { stat, timestamp }))
     }
 
-    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
-        let metric = cpu_metric_from_stats(&previous, &self);
+    async fn save(&self, previous: &InstantCPUMetric, metric: &InstantCPUMetric, mut database: &Pool<PgConnection>, hostname: &str) -> Result<(), MetricSaveError> {
+        let metric = cpu_metric_from_stats(&previous, &metric);
         let timestamp = metric.timestamp.clone();
 
         let futures = metric.stat.into_iter()
@@ -114,7 +121,7 @@ impl Metric for InstantCPUMetric {
         Ok(())
     }
 
-    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+    async fn cleanup(&self, mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
         let min_timestamp = Utc::now() - get_max_metrics_age();
 
         sqlx::query!("delete from metric_cpu where timestamp < $1 returning 1 as result", min_timestamp)
