@@ -29,7 +29,7 @@ use crate::hostname::get_hostname;
 use crate::load_avg::LoadAverageMetric;
 use crate::memory::MemoryMetric;
 use crate::io::InstantIOMetric;
-use crate::fs::FilesystemUsageMetric;
+use crate::fs::FilesystemMetricCollector;
 use crate::network::InstantNetworkMetric;
 use crate::docker::metric::{docker_metric_from_stats, InstantDockerContainerMetric, DockerContainerMetric};
 use crate::nginx::NginxInstantMetric;
@@ -49,9 +49,10 @@ async fn main() {
     let hostname = get_hostname();
 
     let cpu_collector = CpuMetricCollector {};
+    let fs_collector = FilesystemMetricCollector {};
 
     let mut previous_cpu_stat = cpu_collector.collect(&mut database).await;
-    let mut previous_io_stat = InstantIOMetric::collect(&mut database).await;
+    let mut previous_io_stat = fs_collector.collect(&mut database).await;
     let mut previous_network_stat = InstantNetworkMetric::collect(&mut database).await;
     let mut previous_docker_stat = InstantDockerContainerMetric::collect(&mut database).await;
     let mut previous_nginx_stat = NginxInstantMetric::collect(&mut database).await;
@@ -113,8 +114,8 @@ async fn main() {
             Err(err) => warn!("failed to get io stats: {}", err)
         };
 
-        match FilesystemUsageMetric::collect(&database).await {
-            Ok(v) => if let Err(err ) = v.save(&database, &v, &hostname).await {
+        match fs_collector.collect(&database).await {
+            Ok(v) => if let Err(err ) = fs_collector.save(&v, &v, &database, &hostname).await {
                 warn!("failed to save filesystem metric: {}", err);
             },
             Err(err) => warn!("failed to record filesystem usage metric: {}", err)
@@ -176,11 +177,11 @@ async fn main() {
                 warn!("docker metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = InstantCPUMetric::cleanup(&database).await {
+            if let Err(err) = cpu_collector.cleanup(&database).await {
                 warn!("cpu metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = FilesystemUsageMetric::cleanup(&database).await {
+            if let Err(err) = fs_collector.cleanup(&database).await {
                 warn!("fs metric cleanup failed: {}", err);
             }
 

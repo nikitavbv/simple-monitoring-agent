@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use crate::database::Database;
 use std::collections::HashMap;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -28,8 +28,14 @@ pub struct FilesystemUsageMetricEntry {
 
 #[async_trait]
 impl Metric for FilesystemUsageMetric {
+}
 
-    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError> {
+pub struct FilesystemMetricCollector {}
+
+#[async_trait]
+impl MetricCollector for FilesystemMetricCollector {
+
+    async fn collect(&self, mut database: &Pool<PgConnection>) -> Result<Box<_>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = String::from_utf8_lossy(
@@ -54,8 +60,8 @@ impl Metric for FilesystemUsageMetric {
         Ok(Box::new(FilesystemUsageMetric { timestamp, stat }))
     }
 
-    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
-        let timestamp = &self.timestamp.clone();
+    async fn save(&self, previous: &FilesystemUsageMetric, metric: &FilesystemUsageMetric, mut database: &Pool<PgConnection>, hostname: &str) -> Result<(), MetricSaveError> {
+        let timestamp = &metric.timestamp.clone();
 
         let futures = self.clone().stat.into_iter()
             .map(|entry| save_metric_entry(&database, &hostname, *timestamp, entry));
@@ -65,7 +71,7 @@ impl Metric for FilesystemUsageMetric {
         Ok(())
     }
 
-    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+    async fn cleanup(&self, mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
         let min_timestamp = Utc::now() - get_max_metrics_age();
 
         sqlx::query!("delete from metric_fs where timestamp < $1 returning 1 as result", min_timestamp)
