@@ -10,7 +10,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -39,10 +39,15 @@ pub struct IOMetricEntry {
     write: f64
 }
 
-#[async_trait]
 impl Metric for InstantIOMetric {
+}
 
-    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError> {
+pub struct IOMetricCollector {
+}
+
+#[async_trait]
+impl MetricCollector for IOMetricCollector {
+    async fn collect(&self, mut database: &Database) -> Result<Box<InstantIOMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string("/proc/diskstats").await?.lines()
@@ -69,13 +74,13 @@ impl Metric for InstantIOMetric {
         Ok(Box::new(InstantIOMetric { stat, timestamp }))
     }
 
-    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
-        let metric = io_metric_from_stats(previous, self);
+    async fn save(&self, previous: &InstantIOMetric, metric: &InstantIOMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        let metric = io_metric_from_stats(previous, metric);
         save_io_metric(&database, hostname, &metric).await;
         Ok(())
     }
 
-    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+    async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError> {
         let min_timestamp = Utc::now() - get_max_metrics_age();
 
         sqlx::query!("delete from metric_io where timestamp < $1 returning 1 as result", min_timestamp)

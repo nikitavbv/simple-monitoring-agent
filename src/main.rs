@@ -28,7 +28,7 @@ use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::LoadAverageMetric;
 use crate::memory::MemoryMetric;
-use crate::io::InstantIOMetric;
+use crate::io::IOMetricCollector;
 use crate::fs::FilesystemMetricCollector;
 use crate::network::InstantNetworkMetric;
 use crate::docker::metric::{docker_metric_from_stats, InstantDockerContainerMetric, DockerContainerMetric};
@@ -50,6 +50,7 @@ async fn main() {
 
     let cpu_collector = CpuMetricCollector {};
     let fs_collector = FilesystemMetricCollector {};
+    let io_collector = IOMetricCollector {};
 
     let mut previous_cpu_stat = cpu_collector.collect(&mut database).await;
     let mut previous_io_stat = fs_collector.collect(&mut database).await;
@@ -102,10 +103,10 @@ async fn main() {
             Err(err) => warn!("failed to collect memory metric: {}", err)
         };
 
-        match InstantIOMetric::collect(&database).await {
+        match io_collector::collect(&database).await {
             Ok(v) => {
                 if previous_io_stat.is_ok() {
-                    if let Err(err) = v.save(&database, &previous_io_stat.unwrap(), &hostname).await {
+                    if let Err(err) = io_collector.save(&previous_io_stat.unwrap(), &v, &database, &hostname).await {
                         warn!("failed to save io metric: {}", err);
                     }
                 }
@@ -185,7 +186,7 @@ async fn main() {
                 warn!("fs metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = InstantIOMetric::cleanup(&database).await {
+            if let Err(err) = io_collector.cleanup(&database).await {
                 warn!("io metric cleanup failed: {}", err);
             }
 
