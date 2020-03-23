@@ -26,7 +26,7 @@ use crate::cpu::CpuMetricCollector;
 use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
-use crate::load_avg::LoadAverageMetric;
+use crate::load_avg::{LoadAverageMetricCollector, LoadAverageMetric};
 use crate::memory::MemoryMetric;
 use crate::io::IOMetricCollector;
 use crate::fs::FilesystemMetricCollector;
@@ -51,6 +51,7 @@ async fn main() {
     let cpu_collector = CpuMetricCollector {};
     let fs_collector = FilesystemMetricCollector {};
     let io_collector = IOMetricCollector {};
+    let la_collector = LoadAverageMetricCollector {};
 
     let mut previous_cpu_stat = cpu_collector.collect(&mut database).await;
     let mut previous_io_stat = fs_collector.collect(&mut database).await;
@@ -89,8 +90,8 @@ async fn main() {
             Err(err) => warn!("failed to get cpu stats: {}", err)
         };
 
-        match LoadAverageMetric::collect(&database).await {
-            Ok(v) => if let Err(err) = v.save(&database, &v, &hostname).await {
+        match la_collector.collect(&database).await {
+            Ok(v) => if let Err(err) = la_collector.save(&v, &v, &database, &hostname).await {
                 warn!("failed to record load average metric: {}", err);
             },
             Err(err) => warn!("failed to collect load average metric: {}", err)
@@ -190,7 +191,7 @@ async fn main() {
                 warn!("io metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = LoadAverageMetric::cleanup(&database).await {
+            if let Err(err) = la_collector.cleanup(&database).await {
                 warn!("load average metric cleanup failed: {}", err);
             }
 

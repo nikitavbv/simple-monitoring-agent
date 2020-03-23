@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 use sqlx::{PgConnection, Pool};
 
 pub struct LoadAverageMetric {
@@ -20,8 +20,14 @@ pub struct LoadAverageMetric {
 
 #[async_trait]
 impl Metric for LoadAverageMetric {
+}
 
-    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError> {
+pub struct LoadAverageMetricCollector {}
+
+#[async_trait]
+impl MetricCollector for LoadAverageMetricCollector {
+
+    async fn collect(&self, mut database: &Database) -> Result<Box<LoadAverageMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let metric = read_to_string("/proc/loadavg").await?;
@@ -35,7 +41,7 @@ impl Metric for LoadAverageMetric {
         }))
     }
 
-    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
+    async fn save(&self, previous: &LoadAverageMetric, metric: &LoadAverageMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
         sqlx::query!(
             "insert into metric_load_average (hostname, timestamp, one, five, fifteen) values ($1, $2, $3, $4, $5) returning hostname",
             hostname.to_string(), self.timestamp, self.one, self.five, self.fifteen
@@ -44,7 +50,7 @@ impl Metric for LoadAverageMetric {
         Ok(())
     }
 
-    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+    async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError> {
         let min_timestamp = Utc::now() - get_max_metrics_age();
 
         sqlx::query!("delete from metric_load_average where timestamp < $1 returning 1 as result", min_timestamp)
