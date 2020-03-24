@@ -27,7 +27,7 @@ use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
 use crate::load_avg::{LoadAverageMetricCollector, LoadAverageMetric};
-use crate::memory::MemoryMetric;
+use crate::memory::MemoryMetricCollector;
 use crate::io::IOMetricCollector;
 use crate::fs::FilesystemMetricCollector;
 use crate::network::InstantNetworkMetric;
@@ -52,6 +52,7 @@ async fn main() {
     let fs_collector = FilesystemMetricCollector {};
     let io_collector = IOMetricCollector {};
     let la_collector = LoadAverageMetricCollector {};
+    let memory_collector = MemoryMetricCollector {};
 
     let mut previous_cpu_stat = cpu_collector.collect(&mut database).await;
     let mut previous_io_stat = fs_collector.collect(&mut database).await;
@@ -97,8 +98,8 @@ async fn main() {
             Err(err) => warn!("failed to collect load average metric: {}", err)
         };
 
-        match MemoryMetric::collect(&database).await {
-            Ok(v) => if let Err(err) = v.save(&database, &v, &hostname).await {
+        match memory_collector.collect(&database).await {
+            Ok(v) => if let Err(err) = v.save(&v, &v, &database, &hostname).await {
                 warn!("failed to record memory metric: {}", err)
             },
             Err(err) => warn!("failed to collect memory metric: {}", err)

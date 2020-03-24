@@ -9,7 +9,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 use sqlx::{PgConnection, Pool};
 
 pub struct MemoryMetric {
@@ -23,10 +23,16 @@ pub struct MemoryMetric {
     swap_free: Option<i64>
 }
 
-#[async_trait]
 impl Metric for MemoryMetric {
+}
 
-    async fn collect(mut database: &Database) -> Result<Box<Self>, MetricCollectionError> {
+pub struct MemoryMetricCollector {
+}
+
+#[async_trait]
+impl MetricCollector for MemoryMetricCollector {
+
+    async fn collect(&self, mut database: &Database) -> Result<Box<MemoryMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let data: String = read_to_string("/proc/meminfo").await?;
@@ -54,7 +60,7 @@ impl Metric for MemoryMetric {
         }))
     }
 
-    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
+    async fn save(&self, previous: &MemoryMetric, metric: &MemoryMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
         sqlx::query!(
             "insert into metric_memory (hostname, timestamp, total, free, available, buffers, cached, swap_total, swap_free) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
             hostname.to_string(), self.timestamp, self.total.unwrap_or(0), self.free.unwrap_or(0),
@@ -65,7 +71,7 @@ impl Metric for MemoryMetric {
         Ok(())
     }
 
-    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+    async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError> {
         let min_timestamp = Utc::now() - get_max_metrics_age();
 
         sqlx::query!("delete from metric_memory where timestamp < $1 returning 1 as result", min_timestamp)
