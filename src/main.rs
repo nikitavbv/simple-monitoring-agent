@@ -26,11 +26,11 @@ use crate::cpu::CpuMetricCollector;
 use crate::database::{connect, Database};
 use crate::config::get_metric_report_interval;
 use crate::hostname::get_hostname;
-use crate::load_avg::{LoadAverageMetricCollector, LoadAverageMetric};
+use crate::load_avg::LoadAverageMetricCollector;
 use crate::memory::MemoryMetricCollector;
 use crate::io::IOMetricCollector;
 use crate::fs::FilesystemMetricCollector;
-use crate::network::InstantNetworkMetric;
+use crate::network::NetworkMetricCollector;
 use crate::docker::metric::{docker_metric_from_stats, InstantDockerContainerMetric, DockerContainerMetric};
 use crate::nginx::NginxInstantMetric;
 use crate::postgres::{InstantPostgresMetric, DatabaseMetric};
@@ -53,6 +53,7 @@ async fn main() {
     let io_collector = IOMetricCollector {};
     let la_collector = LoadAverageMetricCollector {};
     let memory_collector = MemoryMetricCollector {};
+    let network_collector = NetworkMetricCollector {};
 
     let mut previous_cpu_stat = cpu_collector.collect(&mut database).await;
     let mut previous_io_stat = fs_collector.collect(&mut database).await;
@@ -124,10 +125,10 @@ async fn main() {
             Err(err) => warn!("failed to record filesystem usage metric: {}", err)
         };
 
-        match InstantNetworkMetric::collect(&database).await {
+        match network_collector.collect(&database).await {
             Ok(v) => {
                 if previous_network_stat.is_ok() {
-                    if let Err(err) = v.save(&database, &previous_network_stat.unwrap(), &hostname).await {
+                    if let Err(err) = network_collector.save(&previous_network_stat.unwrap(), &v, &database, &hostname).await {
                         warn!("failed to save network metric: {}", err);
                     }
                 }
@@ -196,11 +197,11 @@ async fn main() {
                 warn!("load average metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = MemoryMetric::cleanup(&database).await {
+            if let Err(err) = memory_collector.cleanup(&database).await {
                 warn!("memory metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = InstantNetworkMetric::cleanup(&database).await {
+            if let Err(err) = network_collector.cleanup(&database).await {
                 warn!("database metric cleanup failed: {}", err);
             }
 
