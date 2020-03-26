@@ -32,7 +32,7 @@ use crate::io::IOMetricCollector;
 use crate::fs::FilesystemMetricCollector;
 use crate::network::NetworkMetricCollector;
 use crate::docker::metric::{docker_metric_from_stats, InstantDockerContainerMetric, DockerContainerMetric};
-use crate::nginx::NginxInstantMetric;
+use crate::nginx::NginxMetricCollector;
 use crate::postgres::{InstantPostgresMetric, DatabaseMetric};
 use crate::types::{Metric, MetricCollector};
 
@@ -54,12 +54,13 @@ async fn main() {
     let la_collector = LoadAverageMetricCollector {};
     let memory_collector = MemoryMetricCollector {};
     let network_collector = NetworkMetricCollector {};
+    let nginx_collector = NginxMetricCollector {};
 
     let mut previous_cpu_stat = cpu_collector.collect(&mut database).await;
     let mut previous_io_stat = fs_collector.collect(&mut database).await;
-    let mut previous_network_stat = InstantNetworkMetric::collect(&mut database).await;
+    let mut previous_network_stat = network_collector.collect(&mut database).await;
     let mut previous_docker_stat = InstantDockerContainerMetric::collect(&mut database).await;
-    let mut previous_nginx_stat = NginxInstantMetric::collect(&mut database).await;
+    let mut previous_nginx_stat = nginx_collector.collect(&mut database).await;
     let mut previous_postgres_stat = InstantPostgresMetric::collect(&mut database).await;
 
     info!("ready");
@@ -151,10 +152,10 @@ async fn main() {
             Err(err) => warn!("failed to get docker stats: {}", err)
         };
 
-        match NginxInstantMetric::collect(&database).await {
+        match nginx_collector.collect(&database).await {
             Ok(v) => {
                 if previous_nginx_stat.is_ok() {
-                    if let Err(err) = v.save(&database, &previous_nginx_stat.unwrap(), &hostname).await {
+                    if let Err(err) = nginx_collector.save(&previous_nginx_stat.unwrap(), &v, &database, &hostname).await {
                         warn!("failed to record nginx metric: {}", err);
                     }
                 }
