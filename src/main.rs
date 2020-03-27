@@ -33,7 +33,7 @@ use crate::fs::FilesystemMetricCollector;
 use crate::network::NetworkMetricCollector;
 use crate::docker::metric::{docker_metric_from_stats, InstantDockerContainerMetric, DockerContainerMetric};
 use crate::nginx::NginxMetricCollector;
-use crate::postgres::{InstantPostgresMetric, DatabaseMetric};
+use crate::postgres::{InstantPostgresMetric, DatabaseMetric, PostgresMetricCollector};
 use crate::types::{Metric, MetricCollector};
 
 const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
@@ -55,13 +55,14 @@ async fn main() {
     let memory_collector = MemoryMetricCollector {};
     let network_collector = NetworkMetricCollector {};
     let nginx_collector = NginxMetricCollector {};
+    let postgres_collector = PostgresMetricCollector {};
 
     let mut previous_cpu_stat = cpu_collector.collect(&mut database).await;
     let mut previous_io_stat = fs_collector.collect(&mut database).await;
     let mut previous_network_stat = network_collector.collect(&mut database).await;
     let mut previous_docker_stat = InstantDockerContainerMetric::collect(&mut database).await;
     let mut previous_nginx_stat = nginx_collector.collect(&mut database).await;
-    let mut previous_postgres_stat = InstantPostgresMetric::collect(&mut database).await;
+    let mut previous_postgres_stat = postgres_collector.collect(&mut database).await;
 
     info!("ready");
 
@@ -164,10 +165,10 @@ async fn main() {
             Err(err) => warn!("failed to get nginx stats: {}", err)
         }
 
-        match InstantPostgresMetric::collect(&database).await {
+        match postgres_collector.collect(&database).await {
             Ok(v) => {
                 if previous_postgres_stat.is_ok() {
-                    if let Err(err) = v.save(&database, &previous_postgres_stat.unwrap(), &hostname).await {
+                    if let Err(err) = postgres_collector..save(&previous_postgres_stat.unwrap(), &v, &database, &hostname).await {
                         warn!("failed to record postgres metric: {}", err);
                     }
                 }
@@ -210,7 +211,7 @@ async fn main() {
                 warn!("nginx metric cleanup failed: {}", err);
             }
 
-            if let Err(err) = InstantPostgresMetric::cleanup(&database).await {
+            if let Err(err) = postgres_collector.cleanup(&database).await {
                 warn!("postgres metric cleanup failed: {}", err);
             }
         }
