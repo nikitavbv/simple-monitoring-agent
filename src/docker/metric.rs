@@ -10,7 +10,7 @@ use crate::database::Database;
 use crate::docker::client::{containers, DockerClientError, stats, Container, ContainerStats};
 use futures::FutureExt;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 
 #[derive(Debug, Clone)]
 pub struct InstantDockerContainerMetric {
@@ -58,10 +58,15 @@ custom_error!{pub DockerMetricError
     DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed"
 }
 
-#[async_trait]
 impl Metric for InstantDockerContainerMetric {
+}
 
-    async fn collect(mut database: &Pool<PgConnection>) -> Result<Box<Self>, MetricCollectionError> {
+pub struct DockerMetricCollector {}
+
+#[async_trait]
+impl MetricCollector<InstantDockerContainerMetric> for DockerMetricCollector {
+
+    async fn collect(&self, mut database: &Database) -> Result<Box<InstantDockerContainerMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat: Vec<InstantDockerContainerMetricEntry> = join_all(containers().await?.into_iter()
@@ -89,8 +94,8 @@ impl Metric for InstantDockerContainerMetric {
         Ok(Box::new(InstantDockerContainerMetric { timestamp, stat }))
     }
 
-    async fn save(&self, mut database: &Pool<PgConnection>, previous: &Self, hostname: &str) -> Result<(), MetricSaveError> {
-        let metric = docker_metric_from_stats(&previous, &self);
+    async fn save(&self, previous: &InstantDockerContainerMetric, metric: &InstantDockerContainerMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        let metric = docker_metric_from_stats(&previous, &metric);
         let metric = metric.clone();
 
         let timestamp = metric.timestamp.clone();
@@ -103,7 +108,7 @@ impl Metric for InstantDockerContainerMetric {
         Ok(())
     }
 
-    async fn cleanup(mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
+    async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError> {
         let min_timestamp = Utc::now() - get_max_metrics_age();
 
         sqlx::query!("delete from metric_docker_containers where timestamp < $1 returning 1 as result", min_timestamp)
