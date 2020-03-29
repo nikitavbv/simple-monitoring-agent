@@ -53,7 +53,7 @@ pub trait Metric {
 }
 
 #[async_trait]
-pub trait MetricCollector<T, E> {
+pub trait MetricCollector<T> {
     async fn collect(&self, mut database: &Database) -> Result<Box<T>, MetricCollectionError>;
     async fn save(&self, previous: &T, metric: &T, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError>;
     async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError>;

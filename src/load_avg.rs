@@ -25,7 +25,7 @@ impl Metric for LoadAverageMetric {
 pub struct LoadAverageMetricCollector {}
 
 #[async_trait]
-impl MetricCollector for LoadAverageMetricCollector {
+impl MetricCollector<LoadAverageMetric> for LoadAverageMetricCollector {
 
     async fn collect(&self, mut database: &Database) -> Result<Box<LoadAverageMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
@@ -44,7 +44,7 @@ impl MetricCollector for LoadAverageMetricCollector {
     async fn save(&self, previous: &LoadAverageMetric, metric: &LoadAverageMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
         sqlx::query!(
             "insert into metric_load_average (hostname, timestamp, one, five, fifteen) values ($1, $2, $3, $4, $5) returning hostname",
-            hostname.to_string(), self.timestamp, self.one, self.five, self.fifteen
+            hostname.to_string(), metric.timestamp, metric.one, metric.five, metric.fifteen
         ).fetch_one(&mut database).await?;
 
         Ok(())

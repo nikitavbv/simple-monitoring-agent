@@ -48,7 +48,7 @@ pub struct NetworkMetricCollector {
 }
 
 #[async_trait]
-impl MetricCollector for NetworkMetricCollector {
+impl MetricCollector<InstantNetworkMetric> for NetworkMetricCollector {
 
     async fn collect(&self, mut database: &Database) -> Result<Box<InstantNetworkMetric>, MetricCollectionError> {
         let timestamp = Utc::now();

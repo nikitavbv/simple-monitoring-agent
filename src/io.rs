@@ -46,7 +46,7 @@ pub struct IOMetricCollector {
 }
 
 #[async_trait]
-impl MetricCollector for IOMetricCollector {
+impl MetricCollector<InstantIOMetric> for IOMetricCollector {
     async fn collect(&self, mut database: &Database) -> Result<Box<InstantIOMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 

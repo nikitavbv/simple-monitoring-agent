@@ -30,7 +30,7 @@ pub struct MemoryMetricCollector {
 }
 
 #[async_trait]
-impl MetricCollector for MemoryMetricCollector {
+impl MetricCollector<MemoryMetric> for MemoryMetricCollector {
 
     async fn collect(&self, mut database: &Database) -> Result<Box<MemoryMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
@@ -63,9 +63,9 @@ impl MetricCollector for MemoryMetricCollector {
     async fn save(&self, previous: &MemoryMetric, metric: &MemoryMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
         sqlx::query!(
             "insert into metric_memory (hostname, timestamp, total, free, available, buffers, cached, swap_total, swap_free) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-            hostname.to_string(), self.timestamp, self.total.unwrap_or(0), self.free.unwrap_or(0),
-            self.available.unwrap_or(0), self.buffers.unwrap_or(0), self.cached.unwrap_or(0),
-            self.swap_total.unwrap_or(0), self.swap_free.unwrap_or(0)
+            hostname.to_string(), metric.timestamp, metric.total.unwrap_or(0), metric.free.unwrap_or(0),
+            metric.available.unwrap_or(0), metric.buffers.unwrap_or(0), metric.cached.unwrap_or(0),
+            metric.swap_total.unwrap_or(0), metric.swap_free.unwrap_or(0)
         ).fetch_one(&mut database).await?;
 
         Ok(())

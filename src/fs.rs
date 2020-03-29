@@ -33,9 +33,9 @@ impl Metric for FilesystemUsageMetric {
 pub struct FilesystemMetricCollector {}
 
 #[async_trait]
-impl MetricCollector for FilesystemMetricCollector {
+impl MetricCollector<FilesystemUsageMetric> for FilesystemMetricCollector {
 
-    async fn collect(&self, mut database: &Pool<PgConnection>) -> Result<Box<_>, MetricCollectionError> {
+    async fn collect(&self, mut database: &Pool<PgConnection>) -> Result<Box<FilesystemUsageMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = String::from_utf8_lossy(
@@ -63,7 +63,7 @@ impl MetricCollector for FilesystemMetricCollector {
     async fn save(&self, previous: &FilesystemUsageMetric, metric: &FilesystemUsageMetric, mut database: &Pool<PgConnection>, hostname: &str) -> Result<(), MetricSaveError> {
         let timestamp = &metric.timestamp.clone();
 
-        let futures = self.clone().stat.into_iter()
+        let futures = metric.clone().stat.into_iter()
             .map(|entry| save_metric_entry(&database, &hostname, *timestamp, entry));
 
         try_join_all(futures).await?;
