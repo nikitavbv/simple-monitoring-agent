@@ -1,4 +1,5 @@
 #![feature(try_trait)]
+#![feature(associated_type_bounds)]
 
 extern crate custom_error;
 
@@ -21,6 +22,7 @@ use std::env;
 
 use async_std::task;
 use log::{info, warn};
+use futures::future::{try_join_all, try_join};
 
 use crate::cpu::CpuMetricCollector;
 use crate::database::{connect, Database};
@@ -57,6 +59,12 @@ async fn main() {
     let nginx_collector = NginxMetricCollector {};
     let postgres_collector = PostgresMetricCollector {};
     let docker_collector = DockerMetricCollector {};
+
+    let collectors: Vec<Box<dyn MetricCollector<Metric>>> = vec![
+        Box::new(cpu_collector), Box::new(fs_collector), Box::new(io_collector), Box::new(la_collector),
+        Box::new(memory_collector), Box::new(network_collector), Box::new(nginx_collector),
+        Box::new(postgres_collector), Box::new(docker_collector)
+    ];
 
     let mut previous_cpu_stat = cpu_collector.collect(&mut database).await;
     let mut previous_io_stat = io_collector.collect(&mut database).await;
@@ -180,41 +188,7 @@ async fn main() {
 
         if iter_count % METRICS_CLEANUP_INTERVAL == 0 {
             // time to clean up
-            if let Err(err) = docker_collector.cleanup(&database).await {
-                warn!("docker metric cleanup failed: {}", err);
-            }
-
-            if let Err(err) = cpu_collector.cleanup(&database).await {
-                warn!("cpu metric cleanup failed: {}", err);
-            }
-
-            if let Err(err) = fs_collector.cleanup(&database).await {
-                warn!("fs metric cleanup failed: {}", err);
-            }
-
-            if let Err(err) = io_collector.cleanup(&database).await {
-                warn!("io metric cleanup failed: {}", err);
-            }
-
-            if let Err(err) = la_collector.cleanup(&database).await {
-                warn!("load average metric cleanup failed: {}", err);
-            }
-
-            if let Err(err) = memory_collector.cleanup(&database).await {
-                warn!("memory metric cleanup failed: {}", err);
-            }
-
-            if let Err(err) = network_collector.cleanup(&database).await {
-                warn!("database metric cleanup failed: {}", err);
-            }
-
-            if let Err(err) = nginx_collector.cleanup(&database).await {
-                warn!("nginx metric cleanup failed: {}", err);
-            }
-
-            if let Err(err) = postgres_collector.cleanup(&database).await {
-                warn!("postgres metric cleanup failed: {}", err);
-            }
+            try_join_all(collectors.map(|collector| collector.cleanup(&database))).await;
         }
     }
 }
