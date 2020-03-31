@@ -10,7 +10,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -74,17 +74,22 @@ impl From<std::num::ParseIntError> for CPUMetricError {
     }
 }
 
-#[async_trait]
 impl Metric for InstantCPUMetric {
 }
 
 pub struct CpuMetricCollector {
+    previous: Option<InstantCPUMetric>
 }
 
-#[async_trait]
-impl MetricCollector<InstantCPUMetric> for CpuMetricCollector {
+impl CpuMetricCollector {
 
-    async fn collect(&self, mut database: &Database) -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
+    pub fn new() -> CpuMetricCollector {
+        CpuMetricCollector {
+            previous: None
+        }
+    }
+
+    async fn collect_metric(&self, mut database: &Database) -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string("/proc/stat").await?.lines()
@@ -117,6 +122,20 @@ impl MetricCollector<InstantCPUMetric> for CpuMetricCollector {
             .map(|entry| save_metric_entry(database, &hostname, timestamp, entry));
 
         try_join_all(futures).await?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl MetricCollector for CpuMetricCollector {
+    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+        let metric = self.collect_metric(&database).await?;
+        if let Some(prev) = &self.previous {
+            self.save(prev, &metric, &database, &hostname).await?;
+        }
+
+        self.previous = Some(metric);
 
         Ok(())
     }

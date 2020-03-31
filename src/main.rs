@@ -50,7 +50,7 @@ async fn main() {
 
     let hostname = get_hostname();
 
-    let cpu_collector = CpuMetricCollector {};
+    let mut cpu_collector = CpuMetricCollector::new();
     let fs_collector = FilesystemMetricCollector {};
     let io_collector = IOMetricCollector {};
     let la_collector = LoadAverageMetricCollector {};
@@ -60,13 +60,12 @@ async fn main() {
     let postgres_collector = PostgresMetricCollector {};
     let docker_collector = DockerMetricCollector {};
 
-    let collectors: Vec<Box<dyn MetricCollector<Metric>>> = vec![
+    let collectors: Vec<Box<dyn MetricCollector> = vec![
         Box::new(cpu_collector), Box::new(fs_collector), Box::new(io_collector), Box::new(la_collector),
         Box::new(memory_collector), Box::new(network_collector), Box::new(nginx_collector),
         Box::new(postgres_collector), Box::new(docker_collector)
     ];
 
-    let mut previous_cpu_stat = cpu_collector.collect(&mut database).await;
     let mut previous_io_stat = io_collector.collect(&mut database).await;
     let mut previous_network_stat = network_collector.collect(&mut database).await;
     let mut previous_docker_stat = docker_collector.collect(&mut database).await;
@@ -91,17 +90,9 @@ async fn main() {
             }
         }
 
-        match cpu_collector.collect(&database).await {
-            Ok(v) => {
-                if previous_cpu_stat.is_ok() {
-                    if let Err(err) = cpu_collector.save(&previous_cpu_stat.unwrap(), &v, &database, &hostname).await {
-                        warn!("failed to save cpu metric: {}", err);
-                    }
-                }
-                previous_cpu_stat = Ok(v);
-            },
-            Err(err) => warn!("failed to get cpu stats: {}", err)
-        };
+        if let Err(err) = cpu_collector.collect(&database, &hostname).await {
+            warn!("failed to collect cpu metric: {}", err);
+        }
 
         match la_collector.collect(&database).await {
             Ok(v) => if let Err(err) = la_collector.save(&v, &v, &database, &hostname).await {
