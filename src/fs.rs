@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use crate::database::Database;
 use std::collections::HashMap;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -32,10 +32,13 @@ impl Metric for FilesystemUsageMetric {
 
 pub struct FilesystemMetricCollector {}
 
-#[async_trait]
-impl MetricCollector<FilesystemUsageMetric> for FilesystemMetricCollector {
+impl FilesystemMetricCollector {
 
-    async fn collect(&self, mut database: &Pool<PgConnection>) -> Result<Box<FilesystemUsageMetric>, MetricCollectionError> {
+    pub fn new() -> Self {
+        FilesystemMetricCollector {}
+    }
+
+    async fn collect_metric(&self, mut database: &Pool<PgConnection>) -> Result<Box<FilesystemUsageMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = String::from_utf8_lossy(
@@ -60,7 +63,7 @@ impl MetricCollector<FilesystemUsageMetric> for FilesystemMetricCollector {
         Ok(Box::new(FilesystemUsageMetric { timestamp, stat }))
     }
 
-    async fn save(&self, previous: &FilesystemUsageMetric, metric: &FilesystemUsageMetric, mut database: &Pool<PgConnection>, hostname: &str) -> Result<(), MetricSaveError> {
+    async fn save(&self, metric: &FilesystemUsageMetric, mut database: &Pool<PgConnection>, hostname: &str) -> Result<(), MetricSaveError> {
         let timestamp = &metric.timestamp.clone();
 
         let futures = metric.clone().stat.into_iter()
@@ -68,6 +71,15 @@ impl MetricCollector<FilesystemUsageMetric> for FilesystemMetricCollector {
 
         try_join_all(futures).await?;
 
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl MetricCollector<FilesystemUsageMetric> for FilesystemMetricCollector {
+    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+        let metric = self.collect_metric(&database).await?;
+        self.save(&metric, &database, hostname).await?;
         Ok(())
     }
 

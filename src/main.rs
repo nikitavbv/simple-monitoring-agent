@@ -51,7 +51,7 @@ async fn main() {
     let hostname = get_hostname();
 
     let mut cpu_collector = CpuMetricCollector::new();
-    let fs_collector = FilesystemMetricCollector {};
+    let mut fs_collector = FilesystemMetricCollector::new();
     let io_collector = IOMetricCollector {};
     let la_collector = LoadAverageMetricCollector {};
     let memory_collector = MemoryMetricCollector {};
@@ -60,7 +60,7 @@ async fn main() {
     let postgres_collector = PostgresMetricCollector {};
     let docker_collector = DockerMetricCollector {};
 
-    let collectors: Vec<Box<dyn MetricCollector> = vec![
+    let collectors: Vec<Box<dyn MetricCollector>> = vec![
         Box::new(cpu_collector), Box::new(fs_collector), Box::new(io_collector), Box::new(la_collector),
         Box::new(memory_collector), Box::new(network_collector), Box::new(nginx_collector),
         Box::new(postgres_collector), Box::new(docker_collector)
@@ -92,6 +92,10 @@ async fn main() {
 
         if let Err(err) = cpu_collector.collect(&database, &hostname).await {
             warn!("failed to collect cpu metric: {}", err);
+        }
+
+        if let Err(err) = fs_collector.collect(&database, &hostname).await {
+            warn!("failed to collect fs metric: {}", err);
         }
 
         match la_collector.collect(&database).await {
