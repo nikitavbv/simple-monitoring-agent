@@ -10,7 +10,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -43,11 +43,18 @@ impl Metric for InstantIOMetric {
 }
 
 pub struct IOMetricCollector {
+    previous: Option<InstantIOMetric>
 }
 
-#[async_trait]
-impl MetricCollector<InstantIOMetric> for IOMetricCollector {
-    async fn collect(&self, mut database: &Database) -> Result<Box<InstantIOMetric>, MetricCollectionError> {
+impl IOMetricCollector {
+
+    pub fn new() -> Self {
+        IOMetricCollector {
+            previous: None
+        }
+    }
+
+    async fn collect_metric(&self, mut database: &Database) -> Result<Box<InstantIOMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string("/proc/diskstats").await?.lines()
@@ -77,6 +84,20 @@ impl MetricCollector<InstantIOMetric> for IOMetricCollector {
     async fn save(&self, previous: &InstantIOMetric, metric: &InstantIOMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
         let metric = io_metric_from_stats(previous, metric);
         save_io_metric(&database, hostname, &metric).await;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl MetricCollector for IOMetricCollector {
+
+    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+        let metric = self.collect_metric(&database).await?;
+        if let Some(previous) = &self.previous {
+            self.save(previous, &metric, database, hostname).await?;
+        }
+
+        self.previous = Some(metric.unwrap());
         Ok(())
     }
 

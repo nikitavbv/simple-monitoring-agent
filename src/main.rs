@@ -52,7 +52,7 @@ async fn main() {
 
     let mut cpu_collector = CpuMetricCollector::new();
     let mut fs_collector = FilesystemMetricCollector::new();
-    let io_collector = IOMetricCollector {};
+    let mut io_collector = IOMetricCollector::new();
     let la_collector = LoadAverageMetricCollector {};
     let memory_collector = MemoryMetricCollector {};
     let network_collector = NetworkMetricCollector {};
@@ -66,7 +66,6 @@ async fn main() {
         Box::new(postgres_collector), Box::new(docker_collector)
     ];
 
-    let mut previous_io_stat = io_collector.collect(&mut database).await;
     let mut previous_network_stat = network_collector.collect(&mut database).await;
     let mut previous_docker_stat = docker_collector.collect(&mut database).await;
     let mut previous_nginx_stat = nginx_collector.collect(&mut database).await;
@@ -98,6 +97,10 @@ async fn main() {
             warn!("failed to collect fs metric: {}", err);
         }
 
+        if let Err(err) = io_collector.collect(&database, &hostname).await {
+            warn!("failed to collect io metric: {}", err);
+        }
+
         match la_collector.collect(&database).await {
             Ok(v) => if let Err(err) = la_collector.save(&v, &v, &database, &hostname).await {
                 warn!("failed to record load average metric: {}", err);
@@ -110,25 +113,6 @@ async fn main() {
                 warn!("failed to record memory metric: {}", err)
             },
             Err(err) => warn!("failed to collect memory metric: {}", err)
-        };
-
-        match io_collector.collect(&database).await {
-            Ok(v) => {
-                if previous_io_stat.is_ok() {
-                    if let Err(err) = io_collector.save(&previous_io_stat.unwrap(), &v, &database, &hostname).await {
-                        warn!("failed to save io metric: {}", err);
-                    }
-                }
-                previous_io_stat = Ok(v);
-            },
-            Err(err) => warn!("failed to get io stats: {}", err)
-        };
-
-        match fs_collector.collect(&database).await {
-            Ok(v) => if let Err(err ) = fs_collector.save(&v, &v, &database, &hostname).await {
-                warn!("failed to save filesystem metric: {}", err);
-            },
-            Err(err) => warn!("failed to record filesystem usage metric: {}", err)
         };
 
         match network_collector.collect(&database).await {
