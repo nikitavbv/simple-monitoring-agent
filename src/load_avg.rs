@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
 use sqlx::{PgConnection, Pool};
 
 pub struct LoadAverageMetric {
@@ -24,10 +24,13 @@ impl Metric for LoadAverageMetric {
 
 pub struct LoadAverageMetricCollector {}
 
-#[async_trait]
-impl MetricCollector<LoadAverageMetric> for LoadAverageMetricCollector {
+impl LoadAverageMetricCollector {
 
-    async fn collect(&self, mut database: &Database) -> Result<Box<LoadAverageMetric>, MetricCollectionError> {
+    pub fn new() -> Self {
+        LoadAverageMetricCollector {}
+    }
+
+    async fn collect_metric(&self, mut database: &Database) -> Result<Box<LoadAverageMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let metric = read_to_string("/proc/loadavg").await?;
@@ -47,6 +50,16 @@ impl MetricCollector<LoadAverageMetric> for LoadAverageMetricCollector {
             hostname.to_string(), metric.timestamp, metric.one, metric.five, metric.fifteen
         ).fetch_one(&mut database).await?;
 
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl MetricCollector<LoadAverageMetric> for LoadAverageMetricCollector {
+
+    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+        let metric = self.collect_metric(database).await?;
+        self.save(&metric, &metric, database, hostname).await?;
         Ok(())
     }
 

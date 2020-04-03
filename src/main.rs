@@ -53,7 +53,7 @@ async fn main() {
     let mut cpu_collector = CpuMetricCollector::new();
     let mut fs_collector = FilesystemMetricCollector::new();
     let mut io_collector = IOMetricCollector::new();
-    let la_collector = LoadAverageMetricCollector {};
+    let mut la_collector = LoadAverageMetricCollector::new();
     let memory_collector = MemoryMetricCollector {};
     let network_collector = NetworkMetricCollector {};
     let nginx_collector = NginxMetricCollector {};
@@ -101,12 +101,9 @@ async fn main() {
             warn!("failed to collect io metric: {}", err);
         }
 
-        match la_collector.collect(&database).await {
-            Ok(v) => if let Err(err) = la_collector.save(&v, &v, &database, &hostname).await {
-                warn!("failed to record load average metric: {}", err);
-            },
-            Err(err) => warn!("failed to collect load average metric: {}", err)
-        };
+        if let Err(err) = la_collector.collect(&database, &hostname).await {
+            warn!("failed to collect la metric: {}", err);
+        }
 
         match memory_collector.collect(&database).await {
             Ok(v) => if let Err(err) = memory_collector.save(&v, &v, &database, &hostname).await {
