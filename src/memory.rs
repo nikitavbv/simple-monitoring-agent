@@ -9,7 +9,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
 use sqlx::{PgConnection, Pool};
 
 pub struct MemoryMetric {
@@ -29,10 +29,13 @@ impl Metric for MemoryMetric {
 pub struct MemoryMetricCollector {
 }
 
-#[async_trait]
-impl MetricCollector<MemoryMetric> for MemoryMetricCollector {
+impl MemoryMetricCollector {
 
-    async fn collect(&self, mut database: &Database) -> Result<Box<MemoryMetric>, MetricCollectionError> {
+    pub fn new() -> Self {
+        MemoryMetricCollector { }
+    }
+
+    async fn collect_metric(&self, mut database: &Database) -> Result<Box<MemoryMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let data: String = read_to_string("/proc/meminfo").await?;
@@ -68,6 +71,16 @@ impl MetricCollector<MemoryMetric> for MemoryMetricCollector {
             metric.swap_total.unwrap_or(0), metric.swap_free.unwrap_or(0)
         ).fetch_one(&mut database).await?;
 
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl MetricCollector<MemoryMetric> for MemoryMetricCollector {
+
+    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+        let metric = self.collect_metric(database).await?;
+        self.save(&metric, &metric, database, hostname).await?;
         Ok(())
     }
 
