@@ -55,7 +55,7 @@ async fn main() {
     let mut io_collector = IOMetricCollector::new();
     let mut la_collector = LoadAverageMetricCollector::new();
     let mut memory_collector = MemoryMetricCollector::new();
-    let network_collector = NetworkMetricCollector {};
+    let mut network_collector = NetworkMetricCollector::new();
     let nginx_collector = NginxMetricCollector {};
     let postgres_collector = PostgresMetricCollector {};
     let docker_collector = DockerMetricCollector {};
@@ -66,7 +66,6 @@ async fn main() {
         Box::new(postgres_collector), Box::new(docker_collector)
     ];
 
-    let mut previous_network_stat = network_collector.collect(&mut database).await;
     let mut previous_docker_stat = docker_collector.collect(&mut database).await;
     let mut previous_nginx_stat = nginx_collector.collect(&mut database).await;
     let mut previous_postgres_stat = postgres_collector.collect(&mut database).await;
@@ -109,19 +108,9 @@ async fn main() {
             warn!("failed to collect memory metric: {}", err);
         }
 
-        match network_collector.collect(&database).await {
-            Ok(v) => {
-                if previous_network_stat.is_ok() {
-                    if let Err(err) = network_collector.save(&previous_network_stat.unwrap(), &v, &database, &hostname).await {
-                        warn!("failed to save network metric: {}", err);
-                    }
-                }
-                previous_network_stat = Ok(v);
-            },
-            Err(err) => {
-                warn!("failed to get network stats: {}", err);
-            }
-        };
+        if let Err(err) = network_collector.collect(&database, &hostname).await {
+            warn!("failed to collect network metric: {}", err);
+        }
 
         match docker_collector.collect(&mut database).await {
             Ok(v) => {

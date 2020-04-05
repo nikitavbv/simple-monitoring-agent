@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use crate::database::Database;
 use std::env;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -45,12 +45,18 @@ impl Metric for InstantNetworkMetric {
 }
 
 pub struct NetworkMetricCollector {
+    previous: Option<InstantNetworkMetric>
 }
 
-#[async_trait]
-impl MetricCollector<InstantNetworkMetric> for NetworkMetricCollector {
+impl NetworkMetricCollector {
 
-    async fn collect(&self, mut database: &Database) -> Result<Box<InstantNetworkMetric>, MetricCollectionError> {
+    pub fn new() -> Self {
+        NetworkMetricCollector {
+            previous: None
+        }
+    }
+
+    async fn collect_metric(&self, mut database: &Database) -> Result<Box<InstantNetworkMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string(&network_stats_file_name()).await?.lines()
@@ -87,6 +93,19 @@ impl MetricCollector<InstantNetworkMetric> for NetworkMetricCollector {
 
         try_join_all(futures).await?;
 
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl MetricCollector<InstantNetworkMetric> for NetworkMetricCollector {
+
+    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+        let metric = self.collect_metric(database).await?;
+        if let Some(prev) = &self.previous {
+            self.save(prev, &metric, database, hostname).await?;
+        }
+        self.previous = Some(prev);
         Ok(())
     }
 
