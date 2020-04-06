@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -24,12 +24,18 @@ pub struct NginxMetric {
 }
 
 pub struct NginxMetricCollector {
+    previous: Option<NginxInstantMetric>
 }
 
-#[async_trait]
-impl MetricCollector<NginxInstantMetric> for NginxMetricCollector {
+impl NginxMetricCollector {
 
-    async fn collect(&self, mut database: &Database) -> Result<Box<NginxInstantMetric>, MetricCollectionError> {
+    pub fn new() -> Self {
+        NginxMetricCollector {
+            previous: None
+        }
+    }
+
+    async fn collect_metric(&self, mut database: &Database) -> Result<Box<NginxInstantMetric>, MetricCollectionError> {
         let url = match get_nginx_status_endpoint_url() {
             Some(v) => v,
             None => return Err(MetricCollectionError::NotConfigured { description: "nginx not configured".to_string() })
@@ -53,6 +59,19 @@ impl MetricCollector<NginxInstantMetric> for NginxMetricCollector {
             hostname.to_string(), metric.timestamp, metric.handled_requests as i32
         ).fetch_one(&mut database).await?;
 
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl MetricCollector<NginxInstantMetric> for NginxMetricCollector {
+
+    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+        let metric = self.collect_metric(database).await?;
+        if let Some(prev) = &self.previous {
+            self.save(prev, &metric, database, hostname).await?;
+        }
+        self.previous = Some(metric.unwrap());
         Ok(())
     }
 
