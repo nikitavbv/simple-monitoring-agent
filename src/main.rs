@@ -57,7 +57,7 @@ async fn main() {
     let mut memory_collector = MemoryMetricCollector::new();
     let mut network_collector = NetworkMetricCollector::new();
     let mut nginx_collector = NginxMetricCollector::new();
-    let postgres_collector = PostgresMetricCollector {};
+    let mut postgres_collector = PostgresMetricCollector::new();
     let docker_collector = DockerMetricCollector {};
 
     let collectors: Vec<Box<dyn MetricCollector>> = vec![
@@ -67,7 +67,6 @@ async fn main() {
     ];
 
     let mut previous_docker_stat = docker_collector.collect(&mut database).await;
-    let mut previous_postgres_stat = postgres_collector.collect(&mut database).await;
 
     info!("ready");
 
@@ -115,6 +114,10 @@ async fn main() {
             warn!("failed to collect nginx metric: {}", err);
         }
 
+        if let Err(err) = postgres_collector.collect(&database, &hostname).await {
+            warn!("failed to collect postgres metric: {}", err);
+        }
+
         match docker_collector.collect(&mut database).await {
             Ok(v) => {
                 if previous_docker_stat.is_ok() {
@@ -126,19 +129,7 @@ async fn main() {
             },
             Err(err) => warn!("failed to get docker stats: {}", err)
         };
-
-        match postgres_collector.collect(&database).await {
-            Ok(v) => {
-                if previous_postgres_stat.is_ok() {
-                    if let Err(err) = postgres_collector.save(&previous_postgres_stat.unwrap(), &v, &database, &hostname).await {
-                        warn!("failed to record postgres metric: {}", err);
-                    }
-                }
-                previous_postgres_stat = Ok(v);
-            },
-            Err(err) => warn!("failed to get postgres stats: {}", err)
-        }
-
+        
         if iter_count % METRICS_CLEANUP_INTERVAL == 0 {
             // time to clean up
             try_join_all(collectors.map(|collector| collector.cleanup(&database))).await;

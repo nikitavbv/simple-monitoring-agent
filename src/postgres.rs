@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -61,12 +61,19 @@ pub struct TableMetric {
 impl Metric for InstantPostgresMetric {
 }
 
-pub struct PostgresMetricCollector {}
+pub struct PostgresMetricCollector {
+    previous: Option<InstantPostgresMetric>
+}
 
-#[async_trait]
-impl MetricCollector<InstantPostgresMetric> for PostgresMetricCollector {
+impl PostgresMetricCollector {
 
-    async fn collect(&self, mut database: &Database) -> Result<Box<InstantPostgresMetric>, MetricCollectionError> {
+    pub fn new() -> Self {
+        PostgresMetricCollector {
+            previous: None
+        }
+    }
+
+    async fn collect_metric(&self, mut database: &Database) -> Result<Box<InstantPostgresMetric>, MetricCollectionError> {
         let database_to_monitor = match get_postgres_database_name() {
             Some(v) => v,
             None => return Err(MetricCollectionError::NotConfigured {
@@ -126,6 +133,18 @@ SELECT cast(table_name as text), row_estimate, total_bytes AS total
             save_database_metric(&database, hostname, &timestamp, metric.database_metric)
         ).await?;
 
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl MetricCollector<InstantPostgresMetric> for PostgresMetricCollector {
+
+    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+        let metric = self.collect_metric(database).await?;
+        if let Some(prev) = &self.previous {
+            self.save(prev, &metric, database, hostname).await?;
+        }
         Ok(())
     }
 
