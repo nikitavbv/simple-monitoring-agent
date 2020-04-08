@@ -58,15 +58,13 @@ async fn main() {
     let mut network_collector = NetworkMetricCollector::new();
     let mut nginx_collector = NginxMetricCollector::new();
     let mut postgres_collector = PostgresMetricCollector::new();
-    let docker_collector = DockerMetricCollector {};
+    let mut docker_collector = DockerMetricCollector::new();
 
     let collectors: Vec<Box<dyn MetricCollector>> = vec![
         Box::new(cpu_collector), Box::new(fs_collector), Box::new(io_collector), Box::new(la_collector),
         Box::new(memory_collector), Box::new(network_collector), Box::new(nginx_collector),
         Box::new(postgres_collector), Box::new(docker_collector)
     ];
-
-    let mut previous_docker_stat = docker_collector.collect(&mut database).await;
 
     info!("ready");
 
@@ -118,18 +116,10 @@ async fn main() {
             warn!("failed to collect postgres metric: {}", err);
         }
 
-        match docker_collector.collect(&mut database).await {
-            Ok(v) => {
-                if previous_docker_stat.is_ok() {
-                    if let Err(err) = docker_collector.save(&previous_docker_stat.unwrap(), &v, &database, &hostname).await {
-                        warn!("failed to save docker metric: {}", err);
-                    }
-                }
-                previous_docker_stat = Ok(v);
-            },
-            Err(err) => warn!("failed to get docker stats: {}", err)
-        };
-        
+        if let Err(err) = docker_collector.collect(&database, &hostname).await {
+            warn!("failed to collect docker metric: {}", err);
+        }
+
         if iter_count % METRICS_CLEANUP_INTERVAL == 0 {
             // time to clean up
             try_join_all(collectors.map(|collector| collector.cleanup(&database))).await;

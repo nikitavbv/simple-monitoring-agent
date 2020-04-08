@@ -10,7 +10,7 @@ use crate::database::Database;
 use crate::docker::client::{containers, DockerClientError, stats, Container, ContainerStats};
 use futures::FutureExt;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
 
 #[derive(Debug, Clone)]
 pub struct InstantDockerContainerMetric {
@@ -61,12 +61,19 @@ custom_error!{pub DockerMetricError
 impl Metric for InstantDockerContainerMetric {
 }
 
-pub struct DockerMetricCollector {}
+pub struct DockerMetricCollector {
+    previous: Option<InstantDockerContainerMetric>
+}
 
-#[async_trait]
-impl MetricCollector<InstantDockerContainerMetric> for DockerMetricCollector {
+impl DockerMetricCollector {
 
-    async fn collect(&self, mut database: &Database) -> Result<Box<InstantDockerContainerMetric>, MetricCollectionError> {
+    pub fn new() -> Self {
+        DockerMetricCollector {
+            previous: none
+        }
+    }
+
+    async fn collect_metric(&self, mut database: &Database) -> Result<Box<InstantDockerContainerMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat: Vec<InstantDockerContainerMetricEntry> = join_all(containers().await?.into_iter()
@@ -104,6 +111,20 @@ impl MetricCollector<InstantDockerContainerMetric> for DockerMetricCollector {
             .map(|entry| save_metric_entry(&mut database, hostname, &timestamp, entry));
 
         try_join_all(futures).await?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl MetricCollector for DockerMetricCollector {
+
+    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+        let metric = self.collect_metric(database).await?;
+        if let Some(prev) = &self.previous {
+            self.save(prev, &metric, database, hostname).await?;
+        }
+        self.previous = Some(metric.unwrap());
 
         Ok(())
     }
