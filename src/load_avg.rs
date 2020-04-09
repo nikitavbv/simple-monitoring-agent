@@ -55,7 +55,7 @@ impl LoadAverageMetricCollector {
 }
 
 #[async_trait]
-impl MetricCollector<LoadAverageMetric> for LoadAverageMetricCollector {
+impl MetricCollector for LoadAverageMetricCollector {
 
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;

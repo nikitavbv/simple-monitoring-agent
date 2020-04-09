@@ -69,7 +69,7 @@ impl DockerMetricCollector {
 
     pub fn new() -> Self {
         DockerMetricCollector {
-            previous: none
+            previous: None
         }
     }
 

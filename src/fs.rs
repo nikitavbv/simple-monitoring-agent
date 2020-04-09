@@ -76,7 +76,7 @@ impl FilesystemMetricCollector {
 }
 
 #[async_trait]
-impl MetricCollector<FilesystemUsageMetric> for FilesystemMetricCollector {
+impl MetricCollector for FilesystemMetricCollector {
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(&database).await?;
         self.save(&metric, &database, hostname).await?;

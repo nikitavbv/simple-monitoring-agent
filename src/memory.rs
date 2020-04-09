@@ -76,7 +76,7 @@ impl MemoryMetricCollector {
 }
 
 #[async_trait]
-impl MetricCollector<MemoryMetric> for MemoryMetricCollector {
+impl MetricCollector for MemoryMetricCollector {
 
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;

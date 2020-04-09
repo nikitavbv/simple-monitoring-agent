@@ -64,7 +64,7 @@ impl NginxMetricCollector {
 }
 
 #[async_trait]
-impl MetricCollector<NginxInstantMetric> for NginxMetricCollector {
+impl MetricCollector for NginxMetricCollector {
 
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
