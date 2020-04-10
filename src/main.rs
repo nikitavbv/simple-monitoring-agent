@@ -122,7 +122,7 @@ async fn main() {
 
         if iter_count % METRICS_CLEANUP_INTERVAL == 0 {
             // time to clean up
-            try_join_all(collectors.map(|collector| collector.cleanup(&database))).await;
+            try_join_all(collectors.iter().map(|collector| collector.cleanup(&database))).await;
         }
     }
 }

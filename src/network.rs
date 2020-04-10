@@ -105,7 +105,7 @@ impl MetricCollector for NetworkMetricCollector {
         if let Some(prev) = &self.previous {
             self.save(prev, &metric, database, hostname).await?;
         }
-        self.previous = Some(metric);
+        self.previous = Some(*metric);
         Ok(())
     }
 

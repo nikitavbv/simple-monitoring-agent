@@ -135,7 +135,7 @@ impl MetricCollector for CpuMetricCollector {
             self.save(prev, &metric, &database, &hostname).await?;
         }
 
-        self.previous = Some(metric);
+        self.previous = Some(*metric);
 
         Ok(())
     }

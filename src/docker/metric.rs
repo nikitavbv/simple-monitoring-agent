@@ -124,7 +124,7 @@ impl MetricCollector for DockerMetricCollector {
         if let Some(prev) = &self.previous {
             self.save(prev, &metric, database, hostname).await?;
         }
-        self.previous = Some(metric.unwrap());
+        self.previous = Some(*metric);
 
         Ok(())
     }

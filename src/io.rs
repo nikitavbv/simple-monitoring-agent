@@ -97,7 +97,7 @@ impl MetricCollector for IOMetricCollector {
             self.save(previous, &metric, database, hostname).await?;
         }
 
-        self.previous = Some(metric.unwrap());
+        self.previous = Some(*metric);
         Ok(())
     }
 
