@@ -1,5 +1,6 @@
 #![feature(try_trait)]
 #![feature(associated_type_bounds)]
+#![feature(async_closure)]
 
 extern crate custom_error;
 
@@ -37,6 +38,7 @@ use crate::docker::metric::DockerMetricCollector;
 use crate::nginx::NginxMetricCollector;
 use crate::postgres::PostgresMetricCollector;
 use crate::types::{Metric, MetricCollector};
+use futures::FutureExt;
 
 const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
 
@@ -60,7 +62,7 @@ async fn main() {
     let mut postgres_collector = PostgresMetricCollector::new();
     let mut docker_collector = DockerMetricCollector::new();
 
-    let collectors: Vec<Box<dyn MetricCollector>> = vec![
+    let mut collectors: Vec<Box<dyn MetricCollector>> = vec![
         Box::new(cpu_collector), Box::new(fs_collector), Box::new(io_collector), Box::new(la_collector),
         Box::new(memory_collector), Box::new(network_collector), Box::new(nginx_collector),
         Box::new(postgres_collector), Box::new(docker_collector)
@@ -84,40 +86,10 @@ async fn main() {
             }
         }
 
-        if let Err(err) = cpu_collector.collect(&database, &hostname).await {
-            warn!("failed to collect cpu metric: {}", err);
-        }
-
-        if let Err(err) = fs_collector.collect(&database, &hostname).await {
-            warn!("failed to collect fs metric: {}", err);
-        }
-
-        if let Err(err) = io_collector.collect(&database, &hostname).await {
-            warn!("failed to collect io metric: {}", err);
-        }
-
-        if let Err(err) = la_collector.collect(&database, &hostname).await {
-            warn!("failed to collect la metric: {}", err);
-        }
-
-        if let Err(err) = memory_collector.collect(&database, &hostname).await {
-            warn!("failed to collect memory metric: {}", err);
-        }
-
-        if let Err(err) = network_collector.collect(&database, &hostname).await {
-            warn!("failed to collect network metric: {}", err);
-        }
-
-        if let Err(err) = nginx_collector.collect(&database, &hostname).await {
-            warn!("failed to collect nginx metric: {}", err);
-        }
-
-        if let Err(err) = postgres_collector.collect(&database, &hostname).await {
-            warn!("failed to collect postgres metric: {}", err);
-        }
-
-        if let Err(err) = docker_collector.collect(&database, &hostname).await {
-            warn!("failed to collect docker metric: {}", err);
+        for collector in &mut collectors {
+            if let Err(err) = collector.collect(&database, &hostname).await {
+                warn!("failed to collect metric: {}", err);
+            }
         }
 
         if iter_count % METRICS_CLEANUP_INTERVAL == 0 {
