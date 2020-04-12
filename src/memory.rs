@@ -78,6 +78,10 @@ impl MemoryMetricCollector {
 #[async_trait]
 impl MetricCollector for MemoryMetricCollector {
 
+    fn key(&self) -> String {
+        "memory".to_string()
+    }
+
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
         self.save(&metric, &metric, database, hostname).await?;

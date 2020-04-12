@@ -91,6 +91,10 @@ impl IOMetricCollector {
 #[async_trait]
 impl MetricCollector for IOMetricCollector {
 
+    fn key(&self) -> String {
+        "io".to_string()
+    }
+
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(&database).await?;
         if let Some(previous) = &self.previous {

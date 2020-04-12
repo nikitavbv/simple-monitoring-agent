@@ -140,6 +140,10 @@ SELECT cast(table_name as text), row_estimate, total_bytes AS total
 #[async_trait]
 impl MetricCollector for PostgresMetricCollector {
 
+    fn key(&self) -> String {
+        "postgres".to_string()
+    }
+
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
         if let Some(prev) = &self.previous {

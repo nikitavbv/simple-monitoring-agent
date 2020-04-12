@@ -100,6 +100,10 @@ impl NetworkMetricCollector {
 #[async_trait]
 impl MetricCollector for NetworkMetricCollector {
 
+    fn key(&self) -> String {
+        "network".to_string()
+    }
+
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
         if let Some(prev) = &self.previous {

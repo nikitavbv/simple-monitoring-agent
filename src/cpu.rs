@@ -129,6 +129,11 @@ impl CpuMetricCollector {
 
 #[async_trait]
 impl MetricCollector for CpuMetricCollector {
+
+    fn key(&self) -> String {
+        "cpu".to_string()
+    }
+
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(&database).await?;
         if let Some(prev) = &self.previous {

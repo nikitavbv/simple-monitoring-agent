@@ -119,6 +119,10 @@ impl DockerMetricCollector {
 #[async_trait]
 impl MetricCollector for DockerMetricCollector {
 
+    fn key(&self) -> String {
+        "docker".to_string()
+    }
+
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
         if let Some(prev) = &self.previous {

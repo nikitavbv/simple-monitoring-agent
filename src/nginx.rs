@@ -66,6 +66,10 @@ impl NginxMetricCollector {
 #[async_trait]
 impl MetricCollector for NginxMetricCollector {
 
+    fn key(&self) -> String {
+        "nginx".to_string()
+    }
+
     async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
         if let Some(prev) = &self.previous {
