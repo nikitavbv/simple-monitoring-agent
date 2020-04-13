@@ -94,7 +94,9 @@ async fn main() {
 
         if iter_count % METRICS_CLEANUP_INTERVAL == 0 {
             // time to clean up
-            try_join_all(collectors.iter().map(|collector| collector.cleanup(&database))).await;
+            if let Err(err) = try_join_all(collectors.iter().map(|collector| collector.cleanup(&database))).await {
+                warn!("failed to cleanup metrics: {}", err);
+            }
         }
     }
 }
