@@ -51,22 +51,7 @@ async fn main() {
         .expect("failed to connect to database");
 
     let hostname = get_hostname();
-
-    let mut cpu_collector = CpuMetricCollector::new();
-    let mut fs_collector = FilesystemMetricCollector::new();
-    let mut io_collector = IOMetricCollector::new();
-    let mut la_collector = LoadAverageMetricCollector::new();
-    let mut memory_collector = MemoryMetricCollector::new();
-    let mut network_collector = NetworkMetricCollector::new();
-    let mut nginx_collector = NginxMetricCollector::new();
-    let mut postgres_collector = PostgresMetricCollector::new();
-    let mut docker_collector = DockerMetricCollector::new();
-
-    let mut collectors: Vec<Box<dyn MetricCollector>> = vec![
-        Box::new(cpu_collector), Box::new(fs_collector), Box::new(io_collector), Box::new(la_collector),
-        Box::new(memory_collector), Box::new(network_collector), Box::new(nginx_collector),
-        Box::new(postgres_collector), Box::new(docker_collector)
-    ];
+    let mut collectors= get_collectors();
 
     info!("ready");
 
@@ -103,4 +88,23 @@ async fn main() {
 
 async fn check_if_database_connection_is_live(mut database: &Database) -> bool {
     sqlx::query!("SELECT 'DBD::Pg ping test' as ping_response").fetch_one(&mut database).await.is_ok()
+}
+
+fn get_collectors() -> Vec<Box<dyn MetricCollector>> {
+    // TODO: read collectors setup from config file
+    let mut cpu_collector = CpuMetricCollector::new();
+    let mut fs_collector = FilesystemMetricCollector::new();
+    let mut io_collector = IOMetricCollector::new();
+    let mut la_collector = LoadAverageMetricCollector::new();
+    let mut memory_collector = MemoryMetricCollector::new();
+    let mut network_collector = NetworkMetricCollector::new();
+    let mut nginx_collector = NginxMetricCollector::new();
+    let mut postgres_collector = PostgresMetricCollector::new();
+    let mut docker_collector = DockerMetricCollector::new();
+
+    vec![
+        Box::new(cpu_collector), Box::new(fs_collector), Box::new(io_collector), Box::new(la_collector),
+        Box::new(memory_collector), Box::new(network_collector), Box::new(nginx_collector),
+        Box::new(postgres_collector), Box::new(docker_collector)
+    ];
 }
