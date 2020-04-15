@@ -106,5 +106,5 @@ fn get_collectors() -> Vec<Box<dyn MetricCollector>> {
         Box::new(cpu_collector), Box::new(fs_collector), Box::new(io_collector), Box::new(la_collector),
         Box::new(memory_collector), Box::new(network_collector), Box::new(nginx_collector),
         Box::new(postgres_collector), Box::new(docker_collector)
-    ];
+    ]
 }
