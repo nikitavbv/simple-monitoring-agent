@@ -30,12 +30,16 @@ pub struct FilesystemUsageMetricEntry {
 impl Metric for FilesystemUsageMetric {
 }
 
-pub struct FilesystemMetricCollector {}
+pub struct FilesystemMetricCollector {
+    metric: Option<FilesystemUsageMetric>
+}
 
 impl FilesystemMetricCollector {
 
     pub fn new() -> Self {
-        FilesystemMetricCollector {}
+        FilesystemMetricCollector {
+            metric: None
+        }
     }
 
     async fn collect_metric(&self, mut database: &Pool<PgConnection>) -> Result<Box<FilesystemUsageMetric>, MetricCollectionError> {
@@ -62,17 +66,6 @@ impl FilesystemMetricCollector {
 
         Ok(Box::new(FilesystemUsageMetric { timestamp, stat }))
     }
-
-    async fn save(&self, metric: &FilesystemUsageMetric, mut database: &Pool<PgConnection>, hostname: &str) -> Result<(), MetricSaveError> {
-        let timestamp = &metric.timestamp.clone();
-
-        let futures = metric.clone().stat.into_iter()
-            .map(|entry| save_metric_entry(&database, &hostname, *timestamp, entry));
-
-        try_join_all(futures).await?;
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -82,9 +75,21 @@ impl MetricCollector for FilesystemMetricCollector {
         "fs".to_string()
     }
 
-    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
-        let metric = self.collect_metric(&database).await?;
-        self.save(&metric, &database, hostname).await?;
+    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
+        self.metic = Some(self.collect_metric(&database).await?;
+        Ok(())
+    }
+
+    async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        if let Some(metric) = &self.metric {
+            let timestamp = &metric.timestamp.clone();
+
+            let futures = metric.clone().stat.into_iter()
+                .map(|entry| save_metric_entry(&database, &hostname, *timestamp, entry));
+
+            try_join_all(futures).await?;
+        }
+
         Ok(())
     }
 
