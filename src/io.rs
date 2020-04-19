@@ -43,14 +43,16 @@ impl Metric for InstantIOMetric {
 }
 
 pub struct IOMetricCollector {
-    previous: Option<InstantIOMetric>
+    previous: Option<InstantIOMetric>,
+    metric: Option<IOMetric>
 }
 
 impl IOMetricCollector {
 
     pub fn new() -> Self {
         IOMetricCollector {
-            previous: None
+            previous: None,
+            metric: None
         }
     }
 
@@ -80,12 +82,6 @@ impl IOMetricCollector {
 
         Ok(Box::new(InstantIOMetric { stat, timestamp }))
     }
-
-    async fn save(&self, previous: &InstantIOMetric, metric: &InstantIOMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
-        let metric = io_metric_from_stats(previous, metric);
-        save_io_metric(&database, hostname, &metric).await;
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -95,13 +91,21 @@ impl MetricCollector for IOMetricCollector {
         "io".to_string()
     }
 
-    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(&database).await?;
         if let Some(previous) = &self.previous {
-            self.save(previous, &metric, database, hostname).await?;
+            self.metric = Some(io_metric_from_stats(previous, &metric));
         }
 
         self.previous = Some(*metric);
+        Ok(())
+    }
+
+    async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        if let Some(metric) = &self.metric {
+            save_io_metric(&database, hostname, &metric).await;
+        }
+
         Ok(())
     }
 
