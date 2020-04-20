@@ -22,12 +22,16 @@ pub struct LoadAverageMetric {
 impl Metric for LoadAverageMetric {
 }
 
-pub struct LoadAverageMetricCollector {}
+pub struct LoadAverageMetricCollector {
+    metric: Option<LoadAverageMetric>
+}
 
 impl LoadAverageMetricCollector {
 
     pub fn new() -> Self {
-        LoadAverageMetricCollector {}
+        LoadAverageMetricCollector {
+            metric: None
+        }
     }
 
     async fn collect_metric(&self, mut database: &Database) -> Result<Box<LoadAverageMetric>, MetricCollectionError> {
@@ -61,9 +65,15 @@ impl MetricCollector for LoadAverageMetricCollector {
         "la".to_string()
     }
 
-    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
-        let metric = self.collect_metric(database).await?;
-        self.save(&metric, &metric, database, hostname).await?;
+    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
+        self.metric = Some(self.collect_metric(database).await?.unwrap());
+        Ok(())
+    }
+
+    async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        if let Some(metric) = &self.metric {
+            self.save(&metric, &metric, database, hostname)?;
+        }
         Ok(())
     }
 
