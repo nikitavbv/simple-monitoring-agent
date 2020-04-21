@@ -27,12 +27,15 @@ impl Metric for MemoryMetric {
 }
 
 pub struct MemoryMetricCollector {
+    metric: Option<MemoryMetric>
 }
 
 impl MemoryMetricCollector {
 
     pub fn new() -> Self {
-        MemoryMetricCollector { }
+        MemoryMetricCollector {
+            metric: None
+        }
     }
 
     async fn collect_metric(&self, mut database: &Database) -> Result<Box<MemoryMetric>, MetricCollectionError> {
@@ -63,7 +66,7 @@ impl MemoryMetricCollector {
         }))
     }
 
-    async fn save(&self, previous: &MemoryMetric, metric: &MemoryMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+    async fn save_metric(&self, previous: &MemoryMetric, metric: &MemoryMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
         sqlx::query!(
             "insert into metric_memory (hostname, timestamp, total, free, available, buffers, cached, swap_total, swap_free) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
             hostname.to_string(), metric.timestamp, metric.total.unwrap_or(0), metric.free.unwrap_or(0),
@@ -82,9 +85,16 @@ impl MetricCollector for MemoryMetricCollector {
         "memory".to_string()
     }
 
-    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
-        let metric = self.collect_metric(database).await?;
-        self.save(&metric, &metric, database, hostname).await?;
+    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
+        self.metric = Some(self.collect_metric(database).await?.unwrap());
+        Ok(())
+    }
+
+    async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        if let Some (metric) = &self.metric {
+            self.save_metric(metric, metric, database, hostname).await?;
+        }
+
         Ok(())
     }
 
