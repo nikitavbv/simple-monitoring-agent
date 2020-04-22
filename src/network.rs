@@ -45,14 +45,16 @@ impl Metric for InstantNetworkMetric {
 }
 
 pub struct NetworkMetricCollector {
-    previous: Option<InstantNetworkMetric>
+    previous: Option<InstantNetworkMetric>,
+    metric: Option<NetworkMetric>
 }
 
 impl NetworkMetricCollector {
 
     pub fn new() -> Self {
         NetworkMetricCollector {
-            previous: None
+            previous: None,
+            metric: None
         }
     }
 
@@ -82,19 +84,6 @@ impl NetworkMetricCollector {
 
         Ok(Box::new(InstantNetworkMetric { stat, timestamp }))
     }
-
-    async fn save(&self, previous: &InstantNetworkMetric, metric: &InstantNetworkMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
-        let metric = network_metric_from_stats(&previous, &metric);
-
-        let timestamp = metric.timestamp.clone();
-
-        let futures = metric.stat.into_iter()
-            .map(|entry| save_metric_entry(&database, hostname, &timestamp, entry));
-
-        try_join_all(futures).await?;
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -104,12 +93,25 @@ impl MetricCollector for NetworkMetricCollector {
         "network".to_string()
     }
 
-    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
         if let Some(prev) = &self.previous {
-            self.save(prev, &metric, database, hostname).await?;
+            self.metric = network_metric_from_stats(&previous, &metric).await?;
         }
         self.previous = Some(*metric);
+        Ok(())
+    }
+
+    async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        if let Some(metric) = &self.metric {
+            let timestamp = metric.timestamp.clone();
+
+            let futures = metric.stat.into_iter()
+                .map(|entry| save_metric_entry(&database, hostname, &timestamp, entry));
+
+            try_join_all(futures).await?;
+        }
+
         Ok(())
     }
 
