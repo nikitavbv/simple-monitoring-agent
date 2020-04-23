@@ -24,14 +24,16 @@ pub struct NginxMetric {
 }
 
 pub struct NginxMetricCollector {
-    previous: Option<NginxInstantMetric>
+    previous: Option<NginxInstantMetric>,
+    metric: Option<NginxMetric>
 }
 
 impl NginxMetricCollector {
 
     pub fn new() -> Self {
         NginxMetricCollector {
-            previous: None
+            previous: None,
+            metric: None
         }
     }
 
@@ -51,16 +53,6 @@ impl NginxMetricCollector {
             handled_requests: stat.nth(2)?.parse()?
         }))
     }
-
-    async fn save(&self, previous: &NginxInstantMetric, metric: &NginxInstantMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
-        let metric = nginx_metric_from_stats(&previous, &metric);
-        sqlx::query!(
-            "insert into metric_nginx (hostname, timestamp, handled_requests) values ($1, $2, $3) returning hostname",
-            hostname.to_string(), metric.timestamp, metric.handled_requests as i32
-        ).fetch_one(&mut database).await?;
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -70,12 +62,22 @@ impl MetricCollector for NginxMetricCollector {
         "nginx".to_string()
     }
 
-    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
         if let Some(prev) = &self.previous {
-            self.save(prev, &metric, database, hostname).await?;
+            self.metric = Some(nginx_metric_from_stats(&previous, &metric));
         }
         self.previous = Some(*metric);
+        Ok(())
+    }
+
+    async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        if let Some(metric) = &self.metric {
+            sqlx::query!(
+                "insert into metric_nginx (hostname, timestamp, handled_requests) values ($1, $2, $3) returning hostname",
+                hostname.to_string(), metric.timestamp, metric.handled_requests as i32
+            ).fetch_one(&mut database).await?;
+        }
         Ok(())
     }
 
