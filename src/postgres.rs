@@ -62,14 +62,16 @@ impl Metric for InstantPostgresMetric {
 }
 
 pub struct PostgresMetricCollector {
-    previous: Option<InstantPostgresMetric>
+    previous: Option<InstantPostgresMetric>,
+    metric: Some<PostgresMetric>
 }
 
 impl PostgresMetricCollector {
 
     pub fn new() -> Self {
         PostgresMetricCollector {
-            previous: None
+            previous: None,
+            metric: None
         }
     }
 
@@ -119,22 +121,6 @@ SELECT cast(table_name as text), row_estimate, total_bytes AS total
             table_stat
         }))
     }
-
-    async fn save(&self, previous: &InstantPostgresMetric, metric: &InstantPostgresMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
-        let metric = postgres_metric_from_stats(&previous, &metric);
-
-        let timestamp = metric.timestamp.clone();
-
-        let futures = metric.table_metrics.into_iter()
-            .map(|entry| save_table_metric_entry(&database, hostname, &timestamp, entry));
-
-        try_join(
-            try_join_all(futures),
-            save_database_metric(&database, hostname, &timestamp, metric.database_metric)
-        ).await?;
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -144,11 +130,27 @@ impl MetricCollector for PostgresMetricCollector {
         "postgres".to_string()
     }
 
-    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
         if let Some(prev) = &self.previous {
-            self.save(prev, &metric, database, hostname).await?;
+            self.metric = Some(postgres_metric_from_stats(&previous, &metric));
         }
+        Ok(())
+    }
+
+    async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        if let Some(metric) = &self.metric {
+            let timestamp = metric.timestamp.clone();
+
+            let futures = metric.table_metrics.into_iter()
+                .map(|entry| save_table_metric_entry(&database, hostname, &timestamp, entry));
+
+            try_join(
+                try_join_all(futures),
+                save_database_metric(&database, hostname, &timestamp, metric.database_metric)
+            ).await?;
+        }
+
         Ok(())
     }
 
