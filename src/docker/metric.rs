@@ -62,14 +62,16 @@ impl Metric for InstantDockerContainerMetric {
 }
 
 pub struct DockerMetricCollector {
-    previous: Option<InstantDockerContainerMetric>
+    previous: Option<InstantDockerContainerMetric>,
+    metric: Option<DockerContainerMetric>
 }
 
 impl DockerMetricCollector {
 
     pub fn new() -> Self {
         DockerMetricCollector {
-            previous: None
+            previous: None,
+            metric: None
         }
     }
 
@@ -100,20 +102,6 @@ impl DockerMetricCollector {
 
         Ok(Box::new(InstantDockerContainerMetric { timestamp, stat }))
     }
-
-    async fn save(&self, previous: &InstantDockerContainerMetric, metric: &InstantDockerContainerMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
-        let metric = docker_metric_from_stats(&previous, &metric);
-        let metric = metric.clone();
-
-        let timestamp = metric.timestamp.clone();
-
-        let futures = metric.stat.into_iter()
-            .map(|entry| save_metric_entry(&mut database, hostname, &timestamp, entry));
-
-        try_join_all(futures).await?;
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -123,12 +111,25 @@ impl MetricCollector for DockerMetricCollector {
         "docker".to_string()
     }
 
-    async fn collect(&mut self, mut database: &Database, hostname: &str) -> Result<(), MetricCollectorError> {
+    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(database).await?;
         if let Some(prev) = &self.previous {
-            self.save(prev, &metric, database, hostname).await?;
+            self.metric = Some(docker_metric_from_stats(&previous, &metric));
         }
         self.previous = Some(*metric);
+
+        Ok(())
+    }
+
+    async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
+        if let Some(metric) = &self.metric {
+            let timestamp = metric.timestamp.clone();
+
+            let futures = metric.stat.into_iter()
+                .map(|entry| save_metric_entry(&mut database, hostname, &timestamp, entry));
+
+            try_join_all(futures).await?;
+        }
 
         Ok(())
     }
