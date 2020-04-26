@@ -72,7 +72,13 @@ async fn main() {
         }
 
         for collector in &mut collectors {
-            if let Err(err) = collector.collect(&database, &hostname).await {
+            if let Err(err) = collector.collect().await {
+                warn!("failed to collect metric: {}", err);
+            }
+        }
+
+        for collector in &mut collectors {
+            if let Err(err) = collector.save(&database, &hostname).await {
                 warn!("failed to collect metric: {}", err);
             }
         }

@@ -76,7 +76,7 @@ impl MetricCollector for FilesystemMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        self.metic = Some(self.collect_metric(&database).await?;
+        self.metic = Some(self.collect_metric(&database).await?);
         Ok(())
     }
 
