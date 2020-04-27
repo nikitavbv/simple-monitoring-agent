@@ -61,15 +61,17 @@ pub struct TableMetric {
 impl Metric for InstantPostgresMetric {
 }
 
-pub struct PostgresMetricCollector {
+pub struct PostgresMetricCollector<'a> {
+    database: &'a Database,
     previous: Option<InstantPostgresMetric>,
-    metric: Some<PostgresMetric>
+    metric: Option<PostgresMetric>
 }
 
 impl PostgresMetricCollector {
 
-    pub fn new() -> Self {
+    pub fn new(database: &Database) -> Self {
         PostgresMetricCollector {
+            database,
             previous: None,
             metric: None
         }
@@ -131,7 +133,7 @@ impl MetricCollector for PostgresMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        let metric = self.collect_metric(database).await?;
+        let metric = self.collect_metric(self.database).await?;
         if let Some(prev) = &self.previous {
             self.metric = Some(postgres_metric_from_stats(&previous, &metric));
         }

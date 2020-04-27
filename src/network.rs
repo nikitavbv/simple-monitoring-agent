@@ -58,7 +58,7 @@ impl NetworkMetricCollector {
         }
     }
 
-    async fn collect_metric(&self, mut database: &Database) -> Result<Box<InstantNetworkMetric>, MetricCollectionError> {
+    async fn collect_metric(&self) -> Result<Box<InstantNetworkMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string(&network_stats_file_name()).await?.lines()
@@ -94,9 +94,9 @@ impl MetricCollector for NetworkMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        let metric = self.collect_metric(database).await?;
+        let metric = self.collect_metric().await?;
         if let Some(prev) = &self.previous {
-            self.metric = network_metric_from_stats(&previous, &metric).await?;
+            self.metric = network_metric_from_stats(prev, &metric).await?;
         }
         self.previous = Some(*metric);
         Ok(())

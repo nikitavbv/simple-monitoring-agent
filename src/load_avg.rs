@@ -34,7 +34,7 @@ impl LoadAverageMetricCollector {
         }
     }
 
-    async fn collect_metric(&self, mut database: &Database) -> Result<Box<LoadAverageMetric>, MetricCollectionError> {
+    async fn collect_metric(&self) -> Result<Box<LoadAverageMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let metric = read_to_string("/proc/loadavg").await?;
@@ -66,7 +66,7 @@ impl MetricCollector for LoadAverageMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        self.metric = Some(self.collect_metric(database).await?.unwrap());
+        self.metric = Some(self.collect_metric().await?.unwrap());
         Ok(())
     }
 

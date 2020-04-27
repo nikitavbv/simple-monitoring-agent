@@ -75,7 +75,7 @@ impl DockerMetricCollector {
         }
     }
 
-    async fn collect_metric(&self, mut database: &Database) -> Result<Box<InstantDockerContainerMetric>, MetricCollectionError> {
+    async fn collect_metric(&self) -> Result<Box<InstantDockerContainerMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat: Vec<InstantDockerContainerMetricEntry> = join_all(containers().await?.into_iter()
@@ -112,9 +112,9 @@ impl MetricCollector for DockerMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        let metric = self.collect_metric(database).await?;
+        let metric = self.collect_metric().await?;
         if let Some(prev) = &self.previous {
-            self.metric = Some(docker_metric_from_stats(&previous, &metric));
+            self.metric = Some(docker_metric_from_stats(prev, &metric));
         }
         self.previous = Some(*metric);
 

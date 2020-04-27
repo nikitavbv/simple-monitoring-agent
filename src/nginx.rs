@@ -37,7 +37,7 @@ impl NginxMetricCollector {
         }
     }
 
-    async fn collect_metric(&self, mut database: &Database) -> Result<Box<NginxInstantMetric>, MetricCollectionError> {
+    async fn collect_metric(&self) -> Result<Box<NginxInstantMetric>, MetricCollectionError> {
         let url = match get_nginx_status_endpoint_url() {
             Some(v) => v,
             None => return Err(MetricCollectionError::NotConfigured { description: "nginx not configured".to_string() })
@@ -63,9 +63,9 @@ impl MetricCollector for NginxMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        let metric = self.collect_metric(database).await?;
+        let metric = self.collect_metric().await?;
         if let Some(prev) = &self.previous {
-            self.metric = Some(nginx_metric_from_stats(&previous, &metric));
+            self.metric = Some(nginx_metric_from_stats(prev, &metric));
         }
         self.previous = Some(*metric);
         Ok(())

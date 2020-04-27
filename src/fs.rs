@@ -42,7 +42,7 @@ impl FilesystemMetricCollector {
         }
     }
 
-    async fn collect_metric(&self, mut database: &Pool<PgConnection>) -> Result<Box<FilesystemUsageMetric>, MetricCollectionError> {
+    async fn collect_metric(&self) -> Result<Box<FilesystemUsageMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = String::from_utf8_lossy(
@@ -76,7 +76,7 @@ impl MetricCollector for FilesystemMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        self.metic = Some(self.collect_metric(&database).await?);
+        self.metic = Some(self.collect_metric().await?);
         Ok(())
     }
 

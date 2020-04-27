@@ -56,7 +56,7 @@ impl IOMetricCollector {
         }
     }
 
-    async fn collect_metric(&self, mut database: &Database) -> Result<Box<InstantIOMetric>, MetricCollectionError> {
+    async fn collect_metric(&self) -> Result<Box<InstantIOMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string("/proc/diskstats").await?.lines()
@@ -92,7 +92,7 @@ impl MetricCollector for IOMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        let metric = self.collect_metric(&database).await?;
+        let metric = self.collect_metric().await?;
         if let Some(previous) = &self.previous {
             self.metric = Some(io_metric_from_stats(previous, &metric));
         }

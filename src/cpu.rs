@@ -91,7 +91,7 @@ impl CpuMetricCollector {
         }
     }
 
-    async fn collect_metric(&self, mut database: &Database) -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
+    async fn collect_metric(&self) -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string("/proc/stat").await?.lines()
@@ -125,9 +125,9 @@ impl MetricCollector for CpuMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        let metric = self.collect_metric(&database).await?;
+        let metric = self.collect_metric().await?;
         if let Some(prev) = &self.previous {
-            self.metric = Some(cpu_metric_from_stats(&previous, &metric));
+            self.metric = Some(cpu_metric_from_stats(prev, &metric));
         }
 
         self.previous = Some(*metric);

@@ -38,7 +38,7 @@ impl MemoryMetricCollector {
         }
     }
 
-    async fn collect_metric(&self, mut database: &Database) -> Result<Box<MemoryMetric>, MetricCollectionError> {
+    async fn collect_metric(&self) -> Result<Box<MemoryMetric>, MetricCollectionError> {
         let timestamp = Utc::now();
 
         let data: String = read_to_string("/proc/meminfo").await?;
