@@ -38,34 +38,6 @@ impl MemoryMetricCollector {
         }
     }
 
-    async fn collect_metric(&self) -> Result<Box<MemoryMetric>, MetricCollectionError> {
-        let timestamp = Utc::now();
-
-        let data: String = read_to_string("/proc/meminfo").await?;
-        let mut stats: HashMap<String, i64> = data.lines().into_iter().filter_map(|v| {
-            let mut spl = v.split_whitespace();
-            let label = spl.next();
-            let value = spl.next().into_iter().filter_map(|v| v.parse::<i64>().ok()).next();
-
-            if label.is_some() && value.is_some() {
-                Some((label.unwrap().to_string(), value.unwrap()))
-            } else {
-                None
-            }
-        }).collect();
-
-        Ok(Box::new(MemoryMetric {
-            timestamp,
-            total: stats.remove("MemTotal:"),
-            free: stats.remove("MemFree:"),
-            available: stats.remove("MemAvailable:"),
-            buffers: stats.remove("Buffers:"),
-            cached: stats.remove("Cached:"),
-            swap_total: stats.remove("SwapTotal:"),
-            swap_free: stats.remove("SwapFree:")
-        }))
-    }
-
     async fn save_metric(&self, previous: &MemoryMetric, metric: &MemoryMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
         sqlx::query!(
             "insert into metric_memory (hostname, timestamp, total, free, available, buffers, cached, swap_total, swap_free) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
@@ -86,7 +58,32 @@ impl MetricCollector for MemoryMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        self.metric = Some(self.collect_metric(database).await?.unwrap());
+        let timestamp = Utc::now();
+
+        let data: String = read_to_string("/proc/meminfo").await?;
+        let mut stats: HashMap<String, i64> = data.lines().into_iter().filter_map(|v| {
+            let mut spl = v.split_whitespace();
+            let label = spl.next();
+            let value = spl.next().into_iter().filter_map(|v| v.parse::<i64>().ok()).next();
+
+            if label.is_some() && value.is_some() {
+                Some((label.unwrap().to_string(), value.unwrap()))
+            } else {
+                None
+            }
+        }).collect();
+
+        self.metric = Some(MemoryMetric {
+            timestamp,
+            total: stats.remove("MemTotal:"),
+            free: stats.remove("MemFree:"),
+            available: stats.remove("MemAvailable:"),
+            buffers: stats.remove("Buffers:"),
+            cached: stats.remove("Cached:"),
+            swap_total: stats.remove("SwapTotal:"),
+            swap_free: stats.remove("SwapFree:")
+        });
+
         Ok(())
     }
 

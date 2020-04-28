@@ -67,7 +67,7 @@ pub struct PostgresMetricCollector<'a> {
     metric: Option<PostgresMetric>
 }
 
-impl PostgresMetricCollector {
+impl PostgresMetricCollector<'_> {
 
     pub fn new(database: &Database) -> Self {
         PostgresMetricCollector {
@@ -126,7 +126,7 @@ SELECT cast(table_name as text), row_estimate, total_bytes AS total
 }
 
 #[async_trait]
-impl MetricCollector for PostgresMetricCollector {
+impl MetricCollector for PostgresMetricCollector<'_> {
 
     fn key(&self) -> String {
         "postgres".to_string()
@@ -135,7 +135,7 @@ impl MetricCollector for PostgresMetricCollector {
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric(self.database).await?;
         if let Some(prev) = &self.previous {
-            self.metric = Some(postgres_metric_from_stats(&previous, &metric));
+            self.metric = Some(postgres_metric_from_stats(&prev, &metric));
         }
         Ok(())
     }
