@@ -96,7 +96,7 @@ impl MetricCollector for NetworkMetricCollector {
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
         let metric = self.collect_metric().await?;
         if let Some(prev) = &self.previous {
-            self.metric = network_metric_from_stats(prev, &metric).await?;
+            self.metric = network_metric_from_stats(prev, &metric).await.map_err(|err| MetricCollectionError::from(err))?;
         }
         self.previous = Some(*metric);
         Ok(())

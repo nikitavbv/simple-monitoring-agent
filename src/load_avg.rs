@@ -34,20 +34,6 @@ impl LoadAverageMetricCollector {
         }
     }
 
-    async fn collect_metric(&self) -> Result<Box<LoadAverageMetric>, MetricCollectionError> {
-        let timestamp = Utc::now();
-
-        let metric = read_to_string("/proc/loadavg").await?;
-        let mut spl = metric.split_whitespace();
-
-        Ok(Box::new(LoadAverageMetric {
-            timestamp,
-            one: spl.next()?.parse()?,
-            five: spl.next()?.parse()?,
-            fifteen: spl.next()?.parse()?,
-        }))
-    }
-
     async fn save(&self, previous: &LoadAverageMetric, metric: &LoadAverageMetric, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
         sqlx::query!(
             "insert into metric_load_average (hostname, timestamp, one, five, fifteen) values ($1, $2, $3, $4, $5) returning hostname",
@@ -66,13 +52,24 @@ impl MetricCollector for LoadAverageMetricCollector {
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        self.metric = Some(self.collect_metric().await?.unwrap());
+        let timestamp = Utc::now();
+
+        let metric = read_to_string("/proc/loadavg").await?;
+        let mut spl = metric.split_whitespace();
+
+        self.metric = Some(LoadAverageMetric {
+            timestamp,
+            one: spl.next()?.parse()?,
+            five: spl.next()?.parse()?,
+            fifteen: spl.next()?.parse()?,
+        });
+
         Ok(())
     }
 
     async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError> {
         if let Some(metric) = &self.metric {
-            self.save(&metric, &metric, database, hostname)?;
+            self.save(&metric, &metric, database, hostname).await?;
         }
         Ok(())
     }

@@ -60,7 +60,7 @@ impl MetricCollector for MemoryMetricCollector {
     async fn collect(&mut self) -> Result<(), MetricCollectorError> {
         let timestamp = Utc::now();
 
-        let data: String = read_to_string("/proc/meminfo").await?;
+        let data: String = read_to_string("/proc/meminfo").await.map_err(|err| MetricCollectionError::from(err))?;
         let mut stats: HashMap<String, i64> = data.lines().into_iter().filter_map(|v| {
             let mut spl = v.split_whitespace();
             let label = spl.next();
