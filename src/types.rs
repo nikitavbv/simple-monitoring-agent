@@ -48,10 +48,6 @@ impl From<http::uri::InvalidUri> for MetricCollectionError {
     }
 }
 
-custom_error! {pub MetricCollectorError
-    FailedToCollect{source: MetricCollectionError} = "collection failed: {source}",
-}
-
 #[async_trait]
 pub trait Metric {
 }
@@ -59,7 +55,7 @@ pub trait Metric {
 #[async_trait]
 pub trait MetricCollector {
     fn key(&self) -> String;
-    async fn collect(&mut self) -> Result<(), MetricCollectorError>;
+    async fn collect(&mut self) -> Result<(), MetricCollectionError>;
     async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError>;
     async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError>;
 }
