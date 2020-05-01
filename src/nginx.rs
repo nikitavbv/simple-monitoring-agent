@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -62,7 +62,7 @@ impl MetricCollector for NginxMetricCollector {
         "nginx".to_string()
     }
 
-    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
+    async fn collect(&mut self) -> Result<(), MetricCollectionError> {
         let metric = self.collect_metric().await?;
         if let Some(prev) = &self.previous {
             self.metric = Some(nginx_metric_from_stats(prev, &metric));

@@ -9,7 +9,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 use sqlx::{PgConnection, Pool};
 
 pub struct MemoryMetric {
@@ -57,7 +57,7 @@ impl MetricCollector for MemoryMetricCollector {
         "memory".to_string()
     }
 
-    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
+    async fn collect(&mut self) -> Result<(), MetricCollectionError> {
         let timestamp = Utc::now();
 
         let data: String = read_to_string("/proc/meminfo").await.map_err(|err| MetricCollectionError::from(err))?;

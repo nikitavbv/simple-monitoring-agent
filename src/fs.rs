@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use crate::database::Database;
 use std::collections::HashMap;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -41,8 +41,16 @@ impl FilesystemMetricCollector {
             metric: None
         }
     }
+}
 
-    async fn collect_metric(&self) -> Result<Box<FilesystemUsageMetric>, MetricCollectionError> {
+#[async_trait]
+impl MetricCollector for FilesystemMetricCollector {
+
+    fn key(&self) -> String {
+        "fs".to_string()
+    }
+
+    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
         let timestamp = Utc::now();
 
         let stat = String::from_utf8_lossy(
@@ -64,19 +72,8 @@ impl FilesystemMetricCollector {
             .map(|v| v.1)
             .collect();
 
-        Ok(Box::new(FilesystemUsageMetric { timestamp, stat }))
-    }
-}
+        self.metric = Some(FilesystemUsageMetric { timestamp, stat })
 
-#[async_trait]
-impl MetricCollector for FilesystemMetricCollector {
-
-    fn key(&self) -> String {
-        "fs".to_string()
-    }
-
-    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
-        self.metric = Some(self.collect_metric().await?);
         Ok(())
     }
 

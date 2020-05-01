@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricCollectorError};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
 use sqlx::{PgConnection, Pool};
 
 pub struct LoadAverageMetric {
@@ -51,10 +51,11 @@ impl MetricCollector for LoadAverageMetricCollector {
         "la".to_string()
     }
 
-    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
+    async fn collect(&mut self) -> Result<(), MetricCollectionError> {
         let timestamp = Utc::now();
 
-        let metric = read_to_string("/proc/loadavg").await?;
+        let metric = read_to_string("/proc/loadavg").await
+            .map_err(|err| MetricCollectionError::from(err))?;
         let mut spl = metric.split_whitespace();
 
         self.metric = Some(LoadAverageMetric {
