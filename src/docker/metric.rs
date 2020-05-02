@@ -125,7 +125,7 @@ impl MetricCollector for DockerMetricCollector {
         if let Some(metric) = &self.metric {
             let timestamp = metric.timestamp.clone();
 
-            let futures = metric.stat.into_iter()
+            let futures = metric.clone().stat.into_iter()
                 .map(|entry| save_metric_entry(&mut database, hostname, &timestamp, entry));
 
             try_join_all(futures).await?;

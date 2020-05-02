@@ -51,7 +51,7 @@ async fn main() {
         .expect("failed to connect to database");
 
     let hostname = get_hostname();
-    let mut collectors= get_collectors();
+    let mut collectors= get_collectors(&database);
 
     info!("ready");
 
@@ -96,7 +96,7 @@ async fn check_if_database_connection_is_live(mut database: &Database) -> bool {
     sqlx::query!("SELECT 'DBD::Pg ping test' as ping_response").fetch_one(&mut database).await.is_ok()
 }
 
-fn get_collectors() -> Vec<Box<dyn MetricCollector>> {
+fn get_collectors(database: &Database) -> Vec<Box<dyn MetricCollector>> {
     // TODO: read collectors setup from config file
     let mut cpu_collector = CpuMetricCollector::new();
     let mut fs_collector = FilesystemMetricCollector::new();
@@ -105,7 +105,7 @@ fn get_collectors() -> Vec<Box<dyn MetricCollector>> {
     let mut memory_collector = MemoryMetricCollector::new();
     let mut network_collector = NetworkMetricCollector::new();
     let mut nginx_collector = NginxMetricCollector::new();
-    let mut postgres_collector = PostgresMetricCollector::new();
+    let mut postgres_collector = PostgresMetricCollector::new(database.clone());
     let mut docker_collector = DockerMetricCollector::new();
 
     vec![

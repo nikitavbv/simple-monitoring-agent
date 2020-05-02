@@ -96,7 +96,7 @@ impl MetricCollector for NetworkMetricCollector {
     async fn collect(&mut self) -> Result<(), MetricCollectionError> {
         let metric = self.collect_metric().await?;
         if let Some(prev) = &self.previous {
-            self.metric = network_metric_from_stats(prev, &metric).await.map_err(|err| MetricCollectionError::from(err))?;
+            self.metric = Some(network_metric_from_stats(prev, &metric));
         }
         self.previous = Some(*metric);
         Ok(())
@@ -106,7 +106,7 @@ impl MetricCollector for NetworkMetricCollector {
         if let Some(metric) = &self.metric {
             let timestamp = metric.timestamp.clone();
 
-            let futures = metric.stat.into_iter()
+            let futures = metric.clone().stat.into_iter()
                 .map(|entry| save_metric_entry(&database, hostname, &timestamp, entry));
 
             try_join_all(futures).await?;

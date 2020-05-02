@@ -61,15 +61,15 @@ pub struct TableMetric {
 impl Metric for InstantPostgresMetric {
 }
 
-pub struct PostgresMetricCollector<'a> {
-    database: &'a Database,
+pub struct PostgresMetricCollector {
+    database: Database,
     previous: Option<InstantPostgresMetric>,
     metric: Option<PostgresMetric>
 }
 
-impl PostgresMetricCollector<'_> {
+impl PostgresMetricCollector {
 
-    pub fn new(database: &Database) -> Self {
+    pub fn new(database: Database) -> Self {
         PostgresMetricCollector {
             database,
             previous: None,
@@ -126,14 +126,14 @@ SELECT cast(table_name as text), row_estimate, total_bytes AS total
 }
 
 #[async_trait]
-impl MetricCollector for PostgresMetricCollector<'_> {
+impl MetricCollector for PostgresMetricCollector {
 
     fn key(&self) -> String {
         "postgres".to_string()
     }
 
     async fn collect(&mut self) -> Result<(), MetricCollectionError> {
-        let metric = self.collect_metric(self.database).await?;
+        let metric = self.collect_metric(&self.database).await?;
         if let Some(prev) = &self.previous {
             self.metric = Some(postgres_metric_from_stats(&prev, &metric));
         }
@@ -144,12 +144,12 @@ impl MetricCollector for PostgresMetricCollector<'_> {
         if let Some(metric) = &self.metric {
             let timestamp = metric.timestamp.clone();
 
-            let futures = metric.table_metrics.into_iter()
+            let futures = metric.clone().table_metrics.into_iter()
                 .map(|entry| save_table_metric_entry(&database, hostname, &timestamp, entry));
 
             try_join(
                 try_join_all(futures),
-                save_database_metric(&database, hostname, &timestamp, metric.database_metric)
+                save_database_metric(&database, hostname, &timestamp, &metric.database_metric)
             ).await?;
         }
 
@@ -210,7 +210,7 @@ async fn save_table_metric_entry(mut database: &Database, hostname: &str, timest
     Ok(())
 }
 
-async fn save_database_metric(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: DatabaseMetric) -> Result<(), MetricSaveError> {
+async fn save_database_metric(mut database: &Database, hostname: &str, timestamp: &DateTime<Utc>, entry: &DatabaseMetric) -> Result<(), MetricSaveError> {
     sqlx::query!(
         "insert into metric_postgres_database (hostname, timestamp, returned, fetched, inserted, updated, deleted) values ($1, $2, $3, $4, $5, $6, $7)",
         hostname.to_string(), *timestamp, entry.tup_returned, entry.tup_fetched, entry.tup_inserted, entry.tup_updated, entry.tup_deleted

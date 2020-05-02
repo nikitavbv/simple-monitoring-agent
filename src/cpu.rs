@@ -34,13 +34,13 @@ pub struct InstantCPUMetricEntry {
     guest_nice: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CPUMetric {
     timestamp: DateTime<Utc>,
     stat: Vec<CPUMetricEntry>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct CPUMetricEntry {
     cpu: u16,
     user: u64,
@@ -139,7 +139,7 @@ impl MetricCollector for CpuMetricCollector {
         if let Some(metric) = &self.metric {
             let timestamp = metric.timestamp.clone();
 
-            let futures = metric.stat.into_iter()
+            let futures = metric.clone().stat.into_iter()
                 .map(|entry| save_metric_entry(database, &hostname, timestamp, entry));
 
             try_join_all(futures).await?;

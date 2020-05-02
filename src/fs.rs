@@ -50,7 +50,7 @@ impl MetricCollector for FilesystemMetricCollector {
         "fs".to_string()
     }
 
-    async fn collect(&mut self) -> Result<(), MetricCollectorError> {
+    async fn collect(&mut self) -> Result<(), MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = String::from_utf8_lossy(
@@ -72,7 +72,7 @@ impl MetricCollector for FilesystemMetricCollector {
             .map(|v| v.1)
             .collect();
 
-        self.metric = Some(FilesystemUsageMetric { timestamp, stat })
+        self.metric = Some(FilesystemUsageMetric { timestamp, stat });
 
         Ok(())
     }
