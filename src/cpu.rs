@@ -90,8 +90,16 @@ impl CpuMetricCollector {
             metric: None
         }
     }
+}
 
-    async fn collect_metric(&self) -> Result<Box<InstantCPUMetric>, MetricCollectionError> {
+#[async_trait]
+impl MetricCollector for CpuMetricCollector {
+
+    fn key(&self) -> String {
+        "cpu".to_string()
+    }
+
+    async fn collect(&mut self) -> Result<(), MetricCollectionError> {
         let timestamp = Utc::now();
 
         let stat = read_to_string("/proc/stat").await?.lines()
@@ -113,24 +121,13 @@ impl CpuMetricCollector {
             .filter_map(|v: Result<InstantCPUMetricEntry, MetricCollectionError>| v.ok())
             .collect();
 
-        Ok(Box::new(InstantCPUMetric { stat, timestamp }))
-    }
-}
+        let metric = InstantCPUMetric { stat, timestamp };
 
-#[async_trait]
-impl MetricCollector for CpuMetricCollector {
-
-    fn key(&self) -> String {
-        "cpu".to_string()
-    }
-
-    async fn collect(&mut self) -> Result<(), MetricCollectionError> {
-        let metric = self.collect_metric().await?;
         if let Some(prev) = &self.previous {
             self.metric = Some(cpu_metric_from_stats(prev, &metric));
         }
 
-        self.previous = Some(*metric);
+        self.previous = Some(metric);
 
         Ok(())
     }
