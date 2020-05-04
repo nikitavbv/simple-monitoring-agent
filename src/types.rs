@@ -4,6 +4,7 @@ use custom_error::custom_error;
 use async_trait::async_trait;
 use crate::database::Database;
 use crate::docker::client::DockerClientError;
+use serde_json::Value;
 
 custom_error! {pub MetricCollectionError
     FailedToRead{source: std::io::Error} = "failed to read metric: {source}",
@@ -20,6 +21,9 @@ custom_error! {pub MetricSaveError
 
 custom_error! {pub MetricCleanupError
     DatabaseQueryFailed{source: sqlx::error::Error} = "database query failed: {source}"
+}
+
+custom_error! {pub MetricEncodingError
 }
 
 impl From<std::option::NoneError> for MetricCollectionError {
@@ -57,5 +61,6 @@ pub trait MetricCollector {
     fn key(&self) -> String;
     async fn collect(&mut self) -> Result<(), MetricCollectionError>;
     async fn save(&self, mut database: &Database, hostname: &str) -> Result<(), MetricSaveError>;
+    async fn encode(&self) -> Result<Value, MetricEncodingError>;
     async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError>;
 }
