@@ -10,8 +10,9 @@ use async_trait::async_trait;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricEncodingError};
 use sqlx::{PgConnection, Pool};
+use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub struct InstantCPUMetric  {
@@ -143,6 +144,13 @@ impl MetricCollector for CpuMetricCollector {
         }
 
         Ok(())
+    }
+
+    async fn encode(&self) -> Result<Value, MetricEncodingError> {
+        if let Some(metric) = &self.metric {
+            let v = serde_json::to_string(metric)?;
+            Ok(v)
+        }
     }
 
     async fn cleanup(&self, mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
