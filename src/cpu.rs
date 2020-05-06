@@ -146,11 +146,13 @@ impl MetricCollector for CpuMetricCollector {
         Ok(())
     }
 
-    async fn encode(&self) -> Result<Value, MetricEncodingError> {
+    async fn encode(&self) -> Result<String, MetricEncodingError> {
         if let Some(metric) = &self.metric {
             let v = serde_json::to_string(metric)?;
             Ok(v)
         }
+
+        Err(MetricEncodingError::NoRecord)
     }
 
     async fn cleanup(&self, mut database: &Pool<PgConnection>) -> Result<(), MetricCleanupError> {
