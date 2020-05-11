@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use crate::database::Database;
 use std::env;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricEncodingError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -113,6 +113,15 @@ impl MetricCollector for NetworkMetricCollector {
         }
 
         Ok(())
+    }
+
+    async fn encode(&self) -> Result<String, MetricEncodingError> {
+        if let Some(metric) = &self.metric {
+            let v = serde_json::to_string(metric)?;
+            Ok(v)
+        }
+
+        Err(MetricEncodingError::NoRecord)
     }
 
     async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError> {
