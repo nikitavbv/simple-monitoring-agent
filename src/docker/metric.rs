@@ -10,7 +10,7 @@ use crate::database::Database;
 use crate::docker::client::{containers, DockerClientError, stats, Container, ContainerStats};
 use futures::FutureExt;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricEncodingError};
 
 #[derive(Debug, Clone)]
 pub struct InstantDockerContainerMetric {
@@ -132,6 +132,15 @@ impl MetricCollector for DockerMetricCollector {
         }
 
         Ok(())
+    }
+
+    async fn encode(&self) -> Result<String, MetricEncodingError> {
+        if let Some(metric) = &self.metric {
+            let v = serde_json::to_string(metric)?;
+            Ok(v)
+        }
+
+        Err(MetricEncodingError::NoRecord)
     }
 
     async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError> {
