@@ -35,7 +35,7 @@ pub struct InstantCPUMetricEntry {
     guest_nice: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CPUMetric {
     timestamp: DateTime<Utc>,
     stat: Vec<CPUMetricEntry>
