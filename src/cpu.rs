@@ -149,7 +149,7 @@ impl MetricCollector for CpuMetricCollector {
     async fn encode(&self) -> Result<String, MetricEncodingError> {
         if let Some(metric) = &self.metric {
             let v = serde_json::to_string(metric)?;
-            Ok(v)
+            return Ok(v)
         }
 
         Err(MetricEncodingError::NoRecord)
