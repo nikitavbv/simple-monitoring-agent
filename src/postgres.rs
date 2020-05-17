@@ -5,6 +5,7 @@ use futures::future::{try_join_all, try_join};
 use futures::{TryFutureExt, TryStreamExt};
 use custom_error::custom_error;
 use async_trait::async_trait;
+use serde::Serialize;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
@@ -34,14 +35,14 @@ pub struct TableStat {
     total_bytes: i64
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PostgresMetric {
     timestamp: DateTime<Utc>,
     database_metric: DatabaseMetric,
     table_metrics: Vec<TableMetric>
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DatabaseMetric {
     tup_returned: i32,
     tup_fetched: i32,
@@ -50,7 +51,7 @@ pub struct DatabaseMetric {
     tup_deleted: i32
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TableMetric {
     table: String,
     rows: i32,
@@ -159,7 +160,7 @@ impl MetricCollector for PostgresMetricCollector {
     async fn encode(&self) -> Result<String, MetricEncodingError> {
         if let Some(metric) = &self.metric {
             let v = serde_json::to_string(metric)?;
-            Ok(v)
+            return Ok(v);
         }
 
         Err(MetricEncodingError::NoRecord)

@@ -6,12 +6,14 @@ use async_std::fs::read_to_string;
 use custom_error::custom_error;
 use std::collections::HashMap;
 use async_trait::async_trait;
+use serde::Serialize;
+use sqlx::{PgConnection, Pool};
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
 use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricEncodingError, MetricCollector};
-use sqlx::{PgConnection, Pool};
 
+#[derive(Serialize)]
 pub struct MemoryMetric {
     timestamp: DateTime<Utc>,
     total: Option<i64>,
@@ -98,7 +100,7 @@ impl MetricCollector for MemoryMetricCollector {
     async fn encode(&self) -> Result<String, MetricEncodingError> {
         if let Some(metric) = &self.metric {
             let v = serde_json::to_string(metric)?;
-            Ok(v)
+            return Ok(v);
         }
 
         Err(MetricEncodingError::NoRecord)

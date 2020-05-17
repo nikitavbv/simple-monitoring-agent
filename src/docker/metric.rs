@@ -5,6 +5,7 @@ use log::warn;
 
 use sqlx::{PgConnection, Pool};
 use async_trait::async_trait;
+use serde::Serialize;
 
 use crate::database::Database;
 use crate::docker::client::{containers, DockerClientError, stats, Container, ContainerStats};
@@ -33,13 +34,13 @@ pub struct InstantDockerContainerMetricEntry {
     network_rx: u64
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DockerContainerMetric {
     timestamp: DateTime<Utc>,
     stat: Vec<DockerContainerMetricEntry>
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DockerContainerMetricEntry {
     name: String,
     state: String,
@@ -137,7 +138,7 @@ impl MetricCollector for DockerMetricCollector {
     async fn encode(&self) -> Result<String, MetricEncodingError> {
         if let Some(metric) = &self.metric {
             let v = serde_json::to_string(metric)?;
-            Ok(v)
+            return Ok(v);
         }
 
         Err(MetricEncodingError::NoRecord)

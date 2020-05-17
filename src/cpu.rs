@@ -7,12 +7,13 @@ use custom_error::custom_error;
 use futures::future::try_join_all;
 use chrono::{Utc, DateTime, Duration};
 use async_trait::async_trait;
+use sqlx::{PgConnection, Pool};
+use serde_json::Value;
+use serde::Serialize;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
 use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricEncodingError};
-use sqlx::{PgConnection, Pool};
-use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub struct InstantCPUMetric  {

@@ -5,12 +5,14 @@ use async_std::fs::read_to_string;
 use chrono::{Utc, DateTime};
 use custom_error::custom_error;
 use async_trait::async_trait;
+use sqlx::{PgConnection, Pool};
+use serde::Serialize;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
 use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricEncodingError};
-use sqlx::{PgConnection, Pool};
 
+#[derive(Serialize)]
 pub struct LoadAverageMetric {
     timestamp: DateTime<Utc>,
     one: f64,
@@ -78,7 +80,7 @@ impl MetricCollector for LoadAverageMetricCollector {
     async fn encode(&self) -> Result<String, MetricEncodingError> {
         if let Some(metric) = &self.metric {
             let v = serde_json::to_string(metric)?;
-            Ok(v)
+            return Ok(v);
         }
 
         Err(MetricEncodingError::NoRecord)

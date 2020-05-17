@@ -6,20 +6,21 @@ use chrono::{Utc, DateTime};
 use custom_error::custom_error;
 use futures::future::try_join_all;
 use async_trait::async_trait;
+use sqlx::{PgConnection, Pool};
+use serde::Serialize;
 
 use crate::database::Database;
 use std::collections::HashMap;
 use crate::config::get_max_metrics_age;
 use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricEncodingError};
-use sqlx::{PgConnection, Pool};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FilesystemUsageMetric {
     timestamp: DateTime<Utc>,
     stat: Vec<FilesystemUsageMetricEntry>
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FilesystemUsageMetricEntry {
     filesystem: String,
     total: i64,
@@ -93,7 +94,7 @@ impl MetricCollector for FilesystemMetricCollector {
     async fn encode(&self) -> Result<String, MetricEncodingError> {
         if let Some(metric) = &self.metric {
             let v = serde_json::to_string(metric)?;
-            Ok(v)
+            return Ok(v);
         }
 
         Err(MetricEncodingError::NoRecord)

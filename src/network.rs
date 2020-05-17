@@ -7,6 +7,7 @@ use custom_error::custom_error;
 use futures::future::try_join_all;
 use chrono::{Utc, DateTime, Duration};
 use async_trait::async_trait;
+use serde::Serialize;
 
 use crate::database::Database;
 use std::env;
@@ -27,13 +28,13 @@ pub struct InstantNetworkMetricEntry {
     tx: u64
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NetworkMetric {
     timestamp: DateTime<Utc>,
     stat: Vec<NetworkMetricEntry>
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NetworkMetricEntry {
     device: String,
     rx: f64,
@@ -118,7 +119,7 @@ impl MetricCollector for NetworkMetricCollector {
     async fn encode(&self) -> Result<String, MetricEncodingError> {
         if let Some(metric) = &self.metric {
             let v = serde_json::to_string(metric)?;
-            Ok(v)
+            return Ok(v);
         }
 
         Err(MetricEncodingError::NoRecord)

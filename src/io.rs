@@ -7,11 +7,12 @@ use custom_error::custom_error;
 use futures::future::join_all;
 use chrono::{Utc, DateTime, Duration};
 use async_trait::async_trait;
+use sqlx::{PgConnection, Pool};
+use serde::Serialize;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
 use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricEncodingError};
-use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
 pub struct InstantIOMetric {
@@ -26,13 +27,13 @@ pub struct InstantIOMetricEntry {
     sectors_written: u64
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IOMetric {
     timestamp: DateTime<Utc>,
     stat: Vec<IOMetricEntry>
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IOMetricEntry {
     device: String,
     read: f64,

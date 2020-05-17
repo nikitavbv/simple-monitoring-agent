@@ -23,7 +23,8 @@ custom_error! {pub MetricCleanupError
 }
 
 custom_error! {pub MetricEncodingError
-    NoRecord = "no record"
+    NoRecord = "no record",
+    FailedToSerialize{source: serde_json::error::Error} = "failed to serialize"
 }
 
 impl From<std::option::NoneError> for MetricCollectionError {
