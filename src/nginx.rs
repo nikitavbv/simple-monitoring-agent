@@ -5,10 +5,11 @@ use std::env;
 use chrono::{Utc, DateTime};
 use custom_error::custom_error;
 use async_trait::async_trait;
+use serde::Serialize;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
-use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector};
+use crate::types::{Metric, MetricCollectionError, MetricSaveError, MetricCleanupError, MetricCollector, MetricEncodingError};
 use sqlx::{PgConnection, Pool};
 
 #[derive(Debug, Clone)]
@@ -17,7 +18,7 @@ pub struct NginxInstantMetric {
     handled_requests: u64
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NginxMetric {
     timestamp: DateTime<Utc>,
     handled_requests: u32
@@ -79,6 +80,15 @@ impl MetricCollector for NginxMetricCollector {
             ).fetch_one(&mut database).await?;
         }
         Ok(())
+    }
+
+    async fn encode(&self) -> Result<String, MetricEncodingError> {
+        if let Some(metric) = &self.metric {
+            let v = serde_json::to_string(metric)?;
+            return Ok(v);
+        }
+
+        Err(MetricEncodingError::NoRecord)
     }
 
     async fn cleanup(&self, mut database: &Database) -> Result<(), MetricCleanupError> {
