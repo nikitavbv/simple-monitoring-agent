@@ -42,7 +42,7 @@ pub struct CPUMetric {
     stat: Vec<CPUMetricEntry>
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub struct CPUMetricEntry {
     cpu: u16,
     user: u64,
