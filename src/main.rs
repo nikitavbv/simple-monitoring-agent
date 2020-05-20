@@ -2,7 +2,12 @@
 #![feature(associated_type_bounds)]
 #![feature(async_closure)]
 
+#[macro_use]
+extern crate serde;
+extern crate serde_json;
+extern crate serde_derive;
 extern crate custom_error;
+extern crate chrono;
 
 mod config;
 mod cpu;

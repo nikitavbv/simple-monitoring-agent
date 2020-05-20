@@ -5,11 +5,10 @@ use std::num::ParseIntError;
 use async_std::fs::read_to_string;
 use custom_error::custom_error;
 use futures::future::try_join_all;
-use chrono::{Utc, DateTime, Duration};
+use chrono::{self, Utc, DateTime, Duration};
 use async_trait::async_trait;
 use sqlx::{PgConnection, Pool};
 use serde_json::Value;
-use serde::Serialize;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;
