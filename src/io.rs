@@ -7,7 +7,6 @@ use custom_error::custom_error;
 use futures::future::join_all;
 use chrono::{Utc, DateTime, Duration};
 use async_trait::async_trait;
-use sqlx::{PgConnection, Pool};
 use serde::Serialize;
 
 use crate::database::Database;

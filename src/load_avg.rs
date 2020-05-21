@@ -5,7 +5,6 @@ use async_std::fs::read_to_string;
 use chrono::{Utc, DateTime};
 use custom_error::custom_error;
 use async_trait::async_trait;
-use sqlx::{PgConnection, Pool};
 use serde::Serialize;
 
 use crate::database::Database;

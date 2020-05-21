@@ -8,7 +8,6 @@ use futures::future::try_join_all;
 use chrono::{self, Utc, DateTime, Duration};
 use async_trait::async_trait;
 use sqlx::{PgConnection, Pool};
-use serde_json::Value;
 
 use crate::database::Database;
 use crate::config::get_max_metrics_age;

@@ -3,7 +3,6 @@ use custom_error::custom_error;
 use futures::future::{join_all, try_join_all};
 use log::warn;
 
-use sqlx::{PgConnection, Pool};
 use async_trait::async_trait;
 use serde::Serialize;
 
