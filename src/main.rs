@@ -42,7 +42,7 @@ use crate::network::NetworkMetricCollector;
 use crate::docker::metric::DockerMetricCollector;
 use crate::nginx::NginxMetricCollector;
 use crate::postgres::PostgresMetricCollector;
-use crate::types::{Metric, MetricCollector};
+use crate::types::MetricCollector;
 use futures::FutureExt;
 
 const METRICS_CLEANUP_INTERVAL: i64 = 100; // once in 100 collection iterations
